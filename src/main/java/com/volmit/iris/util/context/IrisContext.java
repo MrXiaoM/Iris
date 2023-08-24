@@ -18,7 +18,8 @@
 
 package com.volmit.iris.util.context;
 
-import com.volmit.iris.core.project.loader.IrisData;
+import com.volmit.iris.Iris;
+import com.volmit.iris.core.loader.IrisData;
 import com.volmit.iris.engine.IrisComplex;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.util.collection.KMap;
@@ -29,47 +30,47 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class IrisContext {
+    private static final KMap<Thread, IrisContext> context = new KMap<>();
     private static ChronoLatch cl = new ChronoLatch(60000);
-    private static KMap<Thread, IrisContext> context = new KMap<>();
+    private final Engine engine;
 
-    public static IrisContext get()
-    {
+    public static IrisContext get() {
         return context.get(Thread.currentThread());
     }
 
-    public static void touch(IrisContext c)
-    {
-        synchronized (context)
-        {
+    public static void touch(IrisContext c) {
+        synchronized (context) {
             context.put(Thread.currentThread(), c);
 
-            if(cl.flip())
-            {
-                for(Thread i : context.k())
-                {
-                    if(!i.isAlive())
-                    {
-                        context.remove(i);
+            if (cl.flip()) {
+                dereference();
+            }
+        }
+    }
+
+    public static void dereference() {
+        synchronized (context) {
+            for (Thread i : context.k()) {
+                if (!i.isAlive() || context.get(i).engine.isClosed()) {
+                    if (context.get(i).engine.isClosed()) {
+                        Iris.debug("Dereferenced Context<Engine> " + i.getName() + " " + i.getId());
                     }
+
+                    context.remove(i);
                 }
             }
         }
     }
 
-    private final Engine engine;
-
-    public void touch()
-    {
+    public void touch() {
         IrisContext.touch(this);
     }
 
-    public IrisData getData()
-    {
+    public IrisData getData() {
         return engine.getData();
     }
 
-    public IrisComplex getComplex()
-    {
-        return engine.getFramework().getComplex();
+    public IrisComplex getComplex() {
+        return engine.getComplex();
     }
 }

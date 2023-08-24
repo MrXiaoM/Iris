@@ -18,27 +18,32 @@
 
 package com.volmit.iris.core.tools;
 
+import com.google.common.util.concurrent.AtomicDouble;
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.pregenerator.PregenTask;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.framework.headless.HeadlessWorld;
-import com.volmit.iris.engine.object.dimensional.IrisDimension;
+import com.volmit.iris.core.service.StudioSVC;
+import com.volmit.iris.engine.object.IrisDimension;
+import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.exceptions.IrisException;
-import com.volmit.iris.util.exceptions.MissingDimensionException;
 import com.volmit.iris.util.format.C;
 import com.volmit.iris.util.format.Form;
-import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.plugin.VolmitSender;
 import com.volmit.iris.util.scheduling.J;
 import com.volmit.iris.util.scheduling.O;
 import lombok.Data;
 import lombok.experimental.Accessors;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
+import org.bukkit.GameRule;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.WorldCreator;
 
+import java.io.File;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Makes it a lot easier to setup an engine, world, studio or whatever
@@ -59,7 +64,7 @@ public class IrisCreator {
     /**
      * The seed to use for this generator
      */
-    private long seed = RNG.r.nextLong();
+    private long seed = 1337;
 
     /**
      * The dimension to use. This can be any online dimension, or a dimension in the
@@ -71,13 +76,6 @@ public class IrisCreator {
      * The name of this world.
      */
     private String name = "irisworld";
-
-    /**
-     * Headless mode allows Iris to generate / query engine information
-     * without needing an actual world loaded. This is normally only used
-     * for pregeneration purposes but it could be used for mapping.
-     */
-    private boolean headless = false;
 
     /**
      * Studio mode makes the engine hotloadable and uses the dimension in
@@ -92,141 +90,121 @@ public class IrisCreator {
      * @return the IrisAccess
      * @throws IrisException shit happens
      */
-    public IrisAccess create() throws IrisException {
-        IrisDimension d = IrisToolbelt.getDimension(dimension());
-        IrisAccess access = null;
-        Consumer<Double> prog = (pxx) -> {
-            double px = pxx;
-
-            if (pregen != null && !headless) {
-                px = (px / 2) + 0.5;
-            }
-
-            if (sender != null) {
-                if (sender.isPlayer()) {
-                    sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generating " + Form.pc(px)));
-                } else {
-                    sender.sendMessage("Generating " + Form.f(px, 0));
-                }
-            }
-        };
-
-        if (d == null) {
-            throw new MissingDimensionException("Cannot find dimension '" + dimension() + "'");
+    public World create() throws IrisException {
+        if (Bukkit.isPrimaryThread()) {
+            throw new IrisException("You cannot invoke create() on the main thread.");
         }
 
-        if (headless) {
-            HeadlessWorld w = new HeadlessWorld(name, d, seed, studio);
-            access = w.generate().getGenerator();
-        } else {
-            O<Boolean> done = new O<>();
-            done.set(false);
-            WorldCreator wc = new IrisWorldCreator()
-                    .dimension(dimension)
-                    .name(name)
-                    .seed(seed)
-                    .studio(studio)
-                    .create();
-            access = (IrisAccess) wc.generator();
-            IrisAccess finalAccess1 = access;
+        IrisDimension d = IrisToolbelt.getDimension(dimension());
 
-            J.a(() ->
-            {
-                int req = 400;
+        if (d == null) {
+            throw new IrisException("Dimension cannot be found null for id " + dimension());
+        }
 
-                while (finalAccess1.getGenerated() < req && !done.get()) {
-                    double v = (double) finalAccess1.getGenerated() / (double) req;
+        if (!studio()) {
+            Iris.service(StudioSVC.class).installIntoWorld(sender, d.getLoadKey(), new File(name()));
+        }
 
-                    if (pregen != null) {
-                        v /= 2;
-                    }
+        PlatformChunkGenerator access = null;
+        AtomicReference<World> world = new AtomicReference<>();
+        AtomicDouble pp = new AtomicDouble(0);
+        O<Boolean> done = new O<>();
+        done.set(false);
+        WorldCreator wc = new IrisWorldCreator()
+                .dimension(dimension)
+                .name(name)
+                .seed(seed)
+                .studio(studio)
+                .create();
 
-                    if (sender.isPlayer()) {
-                        sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - finalAccess1.getGenerated()) + " Left)"))));
-                        J.sleep(50);
-                    } else {
-                        sender.sendMessage(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - finalAccess1.getGenerated()) + " Left)")));
-                        J.sleep(1000);
-                    }
+        access = (PlatformChunkGenerator) wc.generator();
+        PlatformChunkGenerator finalAccess1 = access;
 
-                    if (finalAccess1.isFailing()) {
-
-                        sender.sendMessage("Generation Failed!");
-                        break;
-                    }
+        J.a(() ->
+        {
+            int req = 441;
+            Supplier<Integer> g = () -> {
+                try {
+                    return finalAccess1.getEngine().getGenerated();
+                } catch (Throwable e) {
+                    return 0;
                 }
+            };
+            while (g.get() < req) {
+                double v = (double) g.get() / (double) req;
 
-                sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generation Complete"));
-            });
-
-            try {
-                J.sfut(wc::createWorld).get();
-            } catch (Throwable e) {
-                e.printStackTrace();
+                if (sender.isPlayer()) {
+                    sender.sendProgress(v, "Generating");
+                    J.sleep(16);
+                } else {
+                    sender.sendMessage(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - finalAccess1.getEngine().getGenerated()) + " Left)")));
+                    J.sleep(1000);
+                }
             }
+        });
+
+
+        try {
+            J.sfut(() -> {
+                world.set(wc.createWorld());
+            }).get();
+        } catch (Throwable e) {
+            e.printStackTrace();
         }
 
         if (access == null) {
             throw new IrisException("Access is null. Something bad happened.");
         }
 
-        CompletableFuture<Boolean> ff = new CompletableFuture<>();
+        done.set(true);
+
+        if (sender.isPlayer()) {
+            J.s(() -> {
+                sender.player().teleport(new Location(world.get(), 0, world.get().getHighestBlockYAt(0, 0), 0));
+            });
+        }
+
+        if (studio) {
+            J.s(() -> {
+                Iris.linkMultiverseCore.removeFromConfig(world.get());
+
+                if (IrisSettings.get().getStudio().isDisableTimeAndWeather()) {
+                    world.get().setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+                    world.get().setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+                    world.get().setTime(6000);
+                }
+            });
+        }
 
         if (pregen != null) {
+            CompletableFuture<Boolean> ff = new CompletableFuture<>();
+
             IrisToolbelt.pregenerate(pregen, access)
-                    .onProgress(prog)
+                    .onProgress(pp::set)
                     .whenDone(() -> ff.complete(true));
 
             try {
+                AtomicBoolean dx = new AtomicBoolean(false);
+
+                J.a(() -> {
+                    while (!dx.get()) {
+                        if (sender.isPlayer()) {
+                            sender.sendProgress(pp.get(), "Pregenerating");
+                            J.sleep(16);
+                        } else {
+                            sender.sendMessage(C.WHITE + "Pregenerating " + Form.pc(pp.get()));
+                            J.sleep(1000);
+                        }
+                    }
+                });
+
                 ff.get();
+                dx.set(true);
             } catch (Throwable e) {
                 e.printStackTrace();
             }
         }
 
-        try {
-
-            IrisAccess finalAccess = access;
-            J.sfut(() -> {
-                if (headless) {
-                    O<Boolean> done = new O<>();
-                    done.set(false);
-
-                    J.a(() ->
-                    {
-                        int req = 400;
-
-                        while (finalAccess.getGenerated() < req && !done.get()) {
-                            double v = (double) finalAccess.getGenerated() / (double) req;
-                            v = (v / 2) + 0.5;
-
-                            if (sender.isPlayer()) {
-                                sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - finalAccess.getGenerated()) + " Left)"))));
-                                J.sleep(50);
-                            } else {
-                                sender.sendMessage(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - finalAccess.getGenerated()) + " Left)")));
-                                J.sleep(1000);
-                            }
-
-                            if (finalAccess.isFailing()) {
-
-                                sender.sendMessage("Generation Failed!");
-                                break;
-                            }
-                        }
-
-                        sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generation Complete"));
-                    });
-
-                    finalAccess.getHeadlessGenerator().getWorld().load();
-                    done.set(true);
-                }
-            }).get();
-
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
-
-        return access;
+        return world.get();
     }
 }

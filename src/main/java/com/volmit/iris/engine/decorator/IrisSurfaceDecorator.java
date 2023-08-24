@@ -21,14 +21,17 @@ package com.volmit.iris.engine.decorator;
 import com.volmit.iris.Iris;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.engine.framework.Engine;
-import com.volmit.iris.engine.object.biome.InferredType;
-import com.volmit.iris.engine.object.biome.IrisBiome;
-import com.volmit.iris.engine.object.decoration.IrisDecorationPart;
-import com.volmit.iris.engine.object.decoration.IrisDecorator;
+import com.volmit.iris.engine.object.InferredType;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisDecorationPart;
+import com.volmit.iris.engine.object.IrisDecorator;
 import com.volmit.iris.util.documentation.BlockCoordinates;
 import com.volmit.iris.util.hunk.Hunk;
+import org.bukkit.Material;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.PointedDripstone;
 
 public class IrisSurfaceDecorator extends IrisEngineDecorator {
     public IrisSurfaceDecorator(Engine engine) {
@@ -77,10 +80,12 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                 }
 
                 int stack = decorator.getHeight(getRng().nextParallelRNG(Cache.key(realX, realZ)), realX, realZ, getData());
+
                 if (decorator.isScaleStack()) {
-                    int maxStack = max - height;
-                    stack = (int) Math.ceil((double) maxStack * ((double) stack / 100));
-                } else stack = Math.min(height - max, stack);
+                    stack = Math.min((int) Math.ceil((double) max * ((double) stack / 100)), decorator.getAbsoluteMaxStack());
+                } else {
+                    stack = Math.min(max, stack);
+                }
 
                 if (stack == 1) {
                     data.set(x, height, z, decorator.getBlockDataForTop(biome, getRng(), realX, height, realZ, getData()));
@@ -104,6 +109,29 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
 
                     if (underwater && height + 1 + i > getDimension().getFluidHeight()) {
                         break;
+                    }
+
+                    if (bd instanceof PointedDripstone) {
+                        PointedDripstone.Thickness th = PointedDripstone.Thickness.BASE;
+
+                        if (stack == 2) {
+                            th = PointedDripstone.Thickness.FRUSTUM;
+
+                            if (i == stack - 1) {
+                                th = PointedDripstone.Thickness.TIP;
+                            }
+                        } else {
+                            if (i == stack - 1) {
+                                th = PointedDripstone.Thickness.TIP;
+                            } else if (i == stack - 2) {
+                                th = PointedDripstone.Thickness.FRUSTUM;
+                            }
+                        }
+
+
+                        bd = Material.POINTED_DRIPSTONE.createBlockData();
+                        ((PointedDripstone) bd).setThickness(th);
+                        ((PointedDripstone) bd).setVerticalDirection(BlockFace.UP);
                     }
 
                     data.set(x, height + 1 + i, z, bd);

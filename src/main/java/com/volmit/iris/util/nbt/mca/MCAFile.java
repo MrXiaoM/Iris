@@ -53,6 +53,18 @@ public class MCAFile {
     }
 
     /**
+     * Calculates the index of a chunk from its x- and z-coordinates in this region.
+     * This works with absolute and relative coordinates.
+     *
+     * @param chunkX The x-coordinate of the chunk.
+     * @param chunkZ The z-coordinate of the chunk.
+     * @return The index of this chunk.
+     */
+    public static int getChunkIndex(int chunkX, int chunkZ) {
+        return (chunkX & 0x1F) + (chunkZ & 0x1F) * 32;
+    }
+
+    /**
      * Reads an .mca file from a {@code RandomAccessFile} into this object.
      * This method does not perform any cleanups on the data.
      *
@@ -245,18 +257,6 @@ public class MCAFile {
         return getChunk(chunkX, chunkZ) != null;
     }
 
-    /**
-     * Calculates the index of a chunk from its x- and z-coordinates in this region.
-     * This works with absolute and relative coordinates.
-     *
-     * @param chunkX The x-coordinate of the chunk.
-     * @param chunkZ The z-coordinate of the chunk.
-     * @return The index of this chunk.
-     */
-    public static int getChunkIndex(int chunkX, int chunkZ) {
-        return (chunkX & 0x1F) + (chunkZ & 0x1F) * 32;
-    }
-
     private int checkIndex(int index) {
         if (index < 0 || index > 1023) {
             throw new IndexOutOfBoundsException();
@@ -274,29 +274,8 @@ public class MCAFile {
         return chunk;
     }
 
-    /**
-     * @deprecated Use {@link #setBiomeAt(int, int, int, int)} instead
-     */
-    @Deprecated
-    public void setBiomeAt(int blockX, int blockZ, int biomeID) {
-        createChunkIfMissing(blockX, blockZ).setBiomeAt(blockX, blockZ, biomeID);
-    }
-
     public void setBiomeAt(int blockX, int blockY, int blockZ, int biomeID) {
         createChunkIfMissing(blockX, blockZ).setBiomeAt(blockX, blockY, blockZ, biomeID);
-    }
-
-    /**
-     * @deprecated Use {@link #getBiomeAt(int, int, int)} instead
-     */
-    @Deprecated
-    public int getBiomeAt(int blockX, int blockZ) {
-        int chunkX = MCAUtil.blockToChunk(blockX), chunkZ = MCAUtil.blockToChunk(blockZ);
-        Chunk chunk = getChunk(getChunkIndex(chunkX, chunkZ));
-        if (chunk == null) {
-            return -1;
-        }
-        return chunk.getBiomeAt(blockX, blockZ);
     }
 
     /**

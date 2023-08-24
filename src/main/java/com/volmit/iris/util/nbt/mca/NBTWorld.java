@@ -27,7 +27,7 @@ import com.volmit.iris.util.format.C;
 import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.nbt.tag.CompoundTag;
 import com.volmit.iris.util.nbt.tag.StringTag;
-import com.volmit.iris.util.scheduling.IrisLock;
+import com.volmit.iris.util.parallel.HyperLock;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Biome;
 import org.bukkit.block.data.BlockData;
@@ -38,13 +38,41 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 public class NBTWorld {
     private static final BlockData AIR = B.get("AIR");
-    private static final Map<String, CompoundTag> blockDataCache = new KMap<>();
+    private static final Map<BlockData, CompoundTag> blockDataCache = new KMap<>();
+    private static final Function<BlockData, CompoundTag> BLOCK_DATA_COMPUTE = (blockData) -> {
+        CompoundTag s = new CompoundTag();
+        String data = blockData.getAsString(true);
+        NamespacedKey key = blockData.getMaterial().getKey();
+        s.putString("Name", key.getNamespace() + ":" + key.getKey());
+
+        if (data.contains("[")) {
+            String raw = data.split("\\Q[\\E")[1].replaceAll("\\Q]\\E", "");
+            CompoundTag props = new CompoundTag();
+            if (raw.contains(",")) {
+                for (String i : raw.split("\\Q,\\E")) {
+                    String[] m = i.split("\\Q=\\E");
+                    String k = m[0];
+                    String v = m[1];
+                    props.put(k, new StringTag(v));
+                }
+            } else {
+                String[] m = raw.split("\\Q=\\E");
+                String k = m[0];
+                String v = m[1];
+                props.put(k, new StringTag(v));
+            }
+            s.put("Properties", props);
+        }
+
+        return s;
+    };
     private static final Map<Biome, Integer> biomeIds = computeBiomeIDs();
-    private final IrisLock regionLock = new IrisLock("Region");
     private final KMap<Long, MCAFile> loadedRegions;
+    private final HyperLock hyperLock = new HyperLock();
     private final KMap<Long, Long> lastUse;
     private final File worldFolder;
     private final ExecutorService saveQueue;
@@ -61,14 +89,55 @@ public class NBTWorld {
         });
     }
 
+    public static BlockData getBlockData(CompoundTag tag) {
+        if (tag == null) {
+            return B.getAir();
+        }
+
+        StringBuilder p = new StringBuilder(tag.getString("Name"));
+
+        if (tag.containsKey("Properties")) {
+            CompoundTag props = tag.getCompoundTag("Properties");
+            p.append('[');
+
+            for (String i : props.keySet()) {
+                p.append(i).append('=').append(props.getString(i)).append(',');
+            }
+
+            p.deleteCharAt(p.length() - 1).append(']');
+        }
+
+        BlockData b = B.getOrNull(p.toString());
+
+        if (b == null) {
+            return B.getAir();
+        }
+
+        return b;
+    }
+
+    public static CompoundTag getCompound(BlockData bd) {
+        return blockDataCache.computeIfAbsent(bd, BLOCK_DATA_COMPUTE).clone();
+    }
+
+    private static Map<Biome, Integer> computeBiomeIDs() {
+        Map<Biome, Integer> biomeIds = new KMap<>();
+
+        for (Biome biome : Biome.values()) {
+            if (!biome.name().equals("CUSTOM")) {
+                biomeIds.put(biome, INMS.get().getBiomeId(biome));
+            }
+        }
+
+        return biomeIds;
+    }
+
     public void close() {
-        regionLock.lock();
 
         for (Long i : loadedRegions.k()) {
             queueSaveUnload(Cache.keyX(i), Cache.keyZ(i));
         }
 
-        regionLock.unlock();
         saveQueue.shutdown();
         try {
             while (!saveQueue.awaitTermination(3, TimeUnit.SECONDS)) {
@@ -80,13 +149,9 @@ public class NBTWorld {
     }
 
     public void flushNow() {
-        regionLock.lock();
-
         for (Long i : loadedRegions.k()) {
             doSaveUnload(Cache.keyX(i), Cache.keyZ(i));
         }
-
-        regionLock.unlock();
     }
 
     public void queueSaveUnload(int x, int z) {
@@ -103,8 +168,6 @@ public class NBTWorld {
     }
 
     public void save() {
-        regionLock.lock();
-
         boolean saving = true;
 
         for (Long i : loadedRegions.k()) {
@@ -121,8 +184,6 @@ public class NBTWorld {
         }
 
         Iris.debug("Regions: " + C.GOLD + loadedRegions.size() + C.LIGHT_PURPLE);
-
-        regionLock.unlock();
     }
 
     public void queueSave() {
@@ -131,10 +192,8 @@ public class NBTWorld {
 
     public synchronized void unloadRegion(int x, int z) {
         long key = Cache.key(x, z);
-        regionLock.lock();
         loadedRegions.remove(key);
         lastUse.remove(key);
-        regionLock.unlock();
         Iris.debug("Unloaded Region " + C.GOLD + x + " " + z);
     }
 
@@ -168,67 +227,6 @@ public class NBTWorld {
         return new File(worldFolder, "region/r." + x + "." + z + ".mca");
     }
 
-    public static BlockData getBlockData(CompoundTag tag) {
-        if (tag == null) {
-            return B.getAir();
-        }
-
-        StringBuilder p = new StringBuilder(tag.getString("Name"));
-
-        if (tag.containsKey("Properties")) {
-            CompoundTag props = tag.getCompoundTag("Properties");
-            p.append('[');
-
-            for (String i : props.keySet()) {
-                p.append(i).append('=').append(props.getString(i)).append(',');
-            }
-
-            p.deleteCharAt(p.length() - 1).append(']');
-        }
-
-        BlockData b = B.getOrNull(p.toString());
-
-        if (b == null) {
-            return B.getAir();
-        }
-
-        return b;
-    }
-
-    public static CompoundTag getCompound(BlockData blockData) {
-        String data = blockData.getAsString(true);
-
-        if (blockDataCache.containsKey(data)) {
-            return blockDataCache.get(data).clone();
-        }
-
-        CompoundTag s = new CompoundTag();
-        NamespacedKey key = blockData.getMaterial().getKey();
-        s.putString("Name", key.getNamespace() + ":" + key.getKey());
-
-        if (data.contains("[")) {
-            String raw = data.split("\\Q[\\E")[1].replaceAll("\\Q]\\E", "");
-            CompoundTag props = new CompoundTag();
-            if (raw.contains(",")) {
-                for (String i : raw.split("\\Q,\\E")) {
-                    String[] m = i.split("\\Q=\\E");
-                    String k = m[0];
-                    String v = m[1];
-                    props.put(k, new StringTag(v));
-                }
-            } else {
-                String[] m = raw.split("\\Q=\\E");
-                String k = m[0];
-                String v = m[1];
-                props.put(k, new StringTag(v));
-            }
-            s.put("Properties", props);
-        }
-
-        blockDataCache.put(data, s.clone());
-        return s;
-    }
-
     public BlockData getBlockData(int x, int y, int z) {
         try {
             CompoundTag tag = getChunkSection(x >> 4, y >> 4, z >> 4).getBlockStateAt(x & 15, y & 15, z & 15);
@@ -249,6 +247,10 @@ public class NBTWorld {
         getChunkSection(x >> 4, y >> 4, z >> 4).setBlockStateAt(x & 15, y & 15, z & 15, getCompound(data), false);
     }
 
+    public int getBiomeId(Biome b) {
+        return biomeIds.get(b);
+    }
+
     public void setBiome(int x, int y, int z, Biome biome) {
         getChunk(x >> 4, z >> 4).setBiomeAt(x & 15, y, z & 15, biomeIds.get(biome));
     }
@@ -265,8 +267,11 @@ public class NBTWorld {
         return s;
     }
 
-    public synchronized Chunk getChunk(int x, int z) {
-        MCAFile mca = getMCA(x >> 5, z >> 5);
+    public Chunk getChunk(int x, int z) {
+        return getChunk(getMCA(x >> 5, z >> 5), x, z);
+    }
+
+    public Chunk getChunk(MCAFile mca, int x, int z) {
         Chunk c = mca.getChunk(x & 31, z & 31);
 
         if (c == null) {
@@ -277,57 +282,51 @@ public class NBTWorld {
         return c;
     }
 
-    public long getIdleDuration(int x, int z) {
-        Long l = lastUse.get(Cache.key(x, z));
+    public Chunk getNewChunk(MCAFile mca, int x, int z) {
+        Chunk c = Chunk.newChunk();
+        mca.setChunk(x & 31, z & 31, c);
 
-        return l == null ? 0 : (M.ms() - l);
+        return c;
+    }
+
+    public long getIdleDuration(int x, int z) {
+        return hyperLock.withResult(x, z, () -> {
+            Long l = lastUse.get(Cache.key(x, z));
+            return l == null ? 0 : (M.ms() - l);
+        });
     }
 
     public MCAFile getMCA(int x, int z) {
         long key = Cache.key(x, z);
 
-        regionLock.lock();
-        lastUse.put(key, M.ms());
-        MCAFile mcaf = loadedRegions.get(key);
-        regionLock.unlock();
+        return hyperLock.withResult(x, z, () -> {
+            lastUse.put(key, M.ms());
 
-        if (mcaf == null) {
-            mcaf = new MCAFile(x, z);
-            regionLock.lock();
-            loadedRegions.put(key, mcaf);
-            regionLock.unlock();
-        }
+            MCAFile mcaf = loadedRegions.get(key);
 
-        return mcaf;
+            if (mcaf == null) {
+                mcaf = new MCAFile(x, z);
+                loadedRegions.put(key, mcaf);
+            }
+
+            return mcaf;
+        });
     }
 
     public MCAFile getMCAOrNull(int x, int z) {
         long key = Cache.key(x, z);
-        MCAFile ff = null;
-        regionLock.lock();
 
-        if (loadedRegions.containsKey(key)) {
-            lastUse.put(key, M.ms());
-            ff = loadedRegions.get(key);
-        }
+        return hyperLock.withResult(x, z, () -> {
+            if (loadedRegions.containsKey(key)) {
+                lastUse.put(key, M.ms());
+                return loadedRegions.get(key);
+            }
 
-        regionLock.unlock();
-        return ff;
+            return null;
+        });
     }
 
     public int size() {
         return loadedRegions.size();
-    }
-
-    private static Map<Biome, Integer> computeBiomeIDs() {
-        Map<Biome, Integer> biomeIds = new KMap<>();
-
-        for (Biome biome : Biome.values()) {
-            if (!biome.name().equals("CUSTOM")) {
-                biomeIds.put(biome, INMS.get().getBiomeId(biome));
-            }
-        }
-
-        return biomeIds;
     }
 }

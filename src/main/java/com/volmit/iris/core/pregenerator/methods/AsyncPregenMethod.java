@@ -18,6 +18,7 @@
 
 package com.volmit.iris.core.pregenerator.methods;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.pregenerator.PregenListener;
 import com.volmit.iris.core.pregenerator.PregeneratorMethod;
@@ -28,12 +29,12 @@ import io.papermc.lib.PaperLib;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 public class AsyncPregenMethod implements PregeneratorMethod {
     private final World world;
     private final MultiBurst burst;
-    private final KList<CompletableFuture<?>> future;
+    private final KList<Future<?>> future;
 
     public AsyncPregenMethod(World world, int threads) {
         if (!PaperLib.isPaper()) {
@@ -41,13 +42,18 @@ public class AsyncPregenMethod implements PregeneratorMethod {
         }
 
         this.world = world;
-        burst = new MultiBurst("Iris Async Pregenerator", IrisSettings.get().getConcurrency().getPregenThreadPriority(), threads);
+        burst = MultiBurst.burst;
         future = new KList<>(1024);
     }
 
     private void unloadAndSaveAllChunks() {
         try {
             J.sfut(() -> {
+                if (world == null) {
+                    Iris.warn("World was null somehow...");
+                    return;
+                }
+
                 for (Chunk i : world.getLoadedChunks()) {
                     i.unload(true);
                 }
@@ -63,13 +69,14 @@ public class AsyncPregenMethod implements PregeneratorMethod {
             PaperLib.getChunkAtAsync(world, x, z, true).get();
             listener.onChunkGenerated(x, z);
         } catch (Throwable e) {
+            e.printStackTrace();
             J.sleep(5);
             future.add(burst.complete(() -> completeChunk(x, z, listener)));
         }
     }
 
     private void waitForChunks() {
-        for (CompletableFuture<?> i : future.copy()) {
+        for (Future<?> i : future.copy()) {
             try {
                 i.get();
                 future.remove(i);
@@ -92,7 +99,6 @@ public class AsyncPregenMethod implements PregeneratorMethod {
     @Override
     public void close() {
         waitForChunks();
-        burst.shutdownAndAwait();
         unloadAndSaveAllChunks();
     }
 
@@ -114,7 +120,7 @@ public class AsyncPregenMethod implements PregeneratorMethod {
 
     @Override
     public void generateChunk(int x, int z, PregenListener listener) {
-        if (future.size() > IrisSettings.getThreadCount(IrisSettings.get().getConcurrency().getPregenThreadCount())) {
+        if (future.size() > IrisSettings.getThreadCount(IrisSettings.get().getConcurrency().getParallelism())) { // TODO: FIX
             waitForChunks();
         }
 

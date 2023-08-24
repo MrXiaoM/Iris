@@ -21,7 +21,7 @@ package com.volmit.iris.core.gui.components;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.util.interpolation.IrisInterpolation;
 
-import java.awt.*;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.function.BiFunction;
 
@@ -38,26 +38,23 @@ public class IrisRenderer {
         BiFunction<Double, Double, Integer> colorFunction = (d, dx) -> Color.black.getRGB();
 
         switch (currentType) {
-            case BIOME:
-            case DECORATOR_LOAD:
-            case OBJECT_LOAD:
-            case LAYER_LOAD:
-                colorFunction = (x, z) -> renderer.getFramework().getComplex().getTrueBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
+            case BIOME: case DECORATOR_LOAD: case OBJECT_LOAD: case LAYER_LOAD:
+                colorFunction = (x, z) -> renderer.getComplex().getTrueBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
                 break;
             case BIOME_LAND:
-                colorFunction = (x, z) -> renderer.getFramework().getComplex().getLandBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
+                colorFunction = (x, z) -> renderer.getComplex().getLandBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
                 break;
             case BIOME_SEA:
-                colorFunction = (x, z) -> renderer.getFramework().getComplex().getSeaBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
+                colorFunction = (x, z) -> renderer.getComplex().getSeaBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
                 break;
             case REGION:
-                colorFunction = (x, z) -> renderer.getFramework().getComplex().getRegionStream().get(x, z).getColor(renderer.getFramework().getComplex(), currentType).getRGB();
+                colorFunction = (x, z) -> renderer.getComplex().getRegionStream().get(x, z).getColor(renderer.getComplex(), currentType).getRGB();
                 break;
             case CAVE_LAND:
-                colorFunction = (x, z) -> renderer.getFramework().getComplex().getCaveBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
+                colorFunction = (x, z) -> renderer.getComplex().getCaveBiomeStream().get(x, z).getColor(renderer, currentType).getRGB();
                 break;
             case HEIGHT:
-                colorFunction = (x, z) -> Color.getHSBColor(renderer.getFramework().getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
+                colorFunction = (x, z) -> Color.getHSBColor(renderer.getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
                 break;
         }
 

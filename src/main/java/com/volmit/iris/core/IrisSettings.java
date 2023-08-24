@@ -20,11 +20,10 @@ package com.volmit.iris.core;
 
 import com.google.gson.Gson;
 import com.volmit.iris.Iris;
-import com.volmit.iris.util.collection.KSet;
 import com.volmit.iris.util.io.IO;
 import com.volmit.iris.util.json.JSONException;
 import com.volmit.iris.util.json.JSONObject;
-import com.volmit.iris.util.scheduling.J;
+import com.volmit.iris.util.plugin.VolmitSender;
 import lombok.Data;
 
 import java.io.File;
@@ -34,6 +33,7 @@ import java.io.IOException;
 @Data
 public class IrisSettings {
     public static transient IrisSettings settings;
+    public int configurationVersion = 3;
     private IrisSettingsCache cache = new IrisSettingsCache();
     private IrisSettingsConcurrency concurrency = new IrisSettingsConcurrency();
     private IrisSettingsParallax parallax = new IrisSettingsParallax();
@@ -41,19 +41,9 @@ public class IrisSettings {
     private IrisSettingsGUI gui = new IrisSettingsGUI();
     private IrisSettingsGenerator generator = new IrisSettingsGenerator();
     private IrisSettingsStudio studio = new IrisSettingsStudio();
-    public int configurationVersion = 3;
 
-    public boolean isStudio() {
-        return getStudio().isStudio();
-    }
-
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public boolean isUseServerLaunchedGuis() {
-        return getGui().isUseServerLaunchedGuis();
-    }
-
-    public long getParallaxRegionEvictionMS() {
-        return getParallax().getParallaxRegionEvictionMS();
+    public static int getPriority(int c) {
+        return Math.max(Math.min(c, Thread.MAX_PRIORITY), Thread.MIN_PRIORITY);
     }
 
     public static int getThreadCount(int c) {
@@ -62,77 +52,6 @@ public class IrisSettings {
         }
 
         return Math.max(2, c < 0 ? Runtime.getRuntime().availableProcessors() / -c : c);
-    }
-
-    public void forceSave() {
-        File s = Iris.instance.getDataFile("settings.json");
-
-        try {
-            IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
-        } catch (JSONException | IOException e) {
-            e.printStackTrace();
-            Iris.reportError(e);
-        }
-    }
-
-    @Data
-    public static class IrisSettingsCache {
-        public int complexCacheSize = 131072;
-    }
-
-    @Data
-    public static class IrisSettingsConcurrency {
-        public int engineThreadCount = -1;
-        public int engineThreadPriority = 6;
-        public int pregenThreadCount = -1;
-        public int pregenThreadPriority = 8;
-        public int miscThreadCount = -4;
-        public int miscThreadPriority = 3;
-        public boolean unstableLockingHeuristics = false;
-    }
-
-    @Data
-    public static class IrisSettingsParallax {
-        public int parallaxRegionEvictionMS = 15000;
-        public int parallaxChunkEvictionMS = 5000;
-    }
-
-    @Data
-    public static class IrisSettingsGeneral {
-        public boolean commandSounds = true;
-        public boolean debug = false;
-        public boolean verbose = false;
-        public boolean ignoreWorldEdit = false;
-        public boolean disableNMS = false;
-        public boolean pluginMetrics = true;
-        public boolean splashLogoStartup = true;
-        public String forceMainWorld = "";
-    }
-
-    @Data
-    public static class IrisSettingsGUI {
-
-        public boolean useServerLaunchedGuis = true;
-        public boolean maximumPregenGuiFPS = false;
-        public boolean localPregenGui = true;
-    }
-
-    @Data
-    public static class IrisSettingsGenerator {
-
-        public String defaultWorldType = "overworld";
-        public boolean disableMCA = false;
-        public boolean systemEffects = true;
-        public boolean systemEntitySpawnOverrides = true;
-        public boolean systemEntityInitialSpawns = true;
-        public int maxBiomeChildDepth = 4;
-    }
-
-    @Data
-    public static class IrisSettingsStudio {
-        public boolean studio = true;
-        public boolean openVSCode = true;
-        public boolean disableTimeAndWeather = true;
     }
 
     public static IrisSettings get() {
@@ -158,65 +77,14 @@ public class IrisSettings {
                 try {
                     String ss = IO.readAll(s);
                     settings = new Gson().fromJson(ss, IrisSettings.class);
-
-                    J.a(() ->
-                    {
-                        try {
-                            JSONObject j = new JSONObject(ss);
-                            boolean u = false;
-                            for (String i : def.keySet()) {
-                                if (!j.has(i)) {
-                                    u = true;
-                                    j.put(i, def.get(i));
-                                    Iris.warn("Adding new config key: " + i);
-                                }
-                            }
-
-                            for (String i : new KSet<>(j.keySet())) {
-                                if (!def.has(i)) {
-                                    u = true;
-                                    j.remove(i);
-                                    Iris.warn("Removing unused config key: " + i);
-                                }
-                            }
-
-                            if (u) {
-                                try {
-                                    IO.writeAll(s, j.toString(4));
-                                    Iris.info("Updated Configuration Files");
-                                } catch (Throwable e) {
-                                    e.printStackTrace();
-                                    Iris.reportError(e);
-                                }
-                            }
-                        } catch (Throwable ee) {
-                            Iris.reportError(ee);
-                            Iris.error("Configuration Error in settings.json! " + ee.getClass().getSimpleName() + ": " + ee.getMessage());
-                            Iris.warn("Attempting to fix configuration while retaining valid in-memory settings...");
-
-                            try {
-                                IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
-                                Iris.info("Configuration Fixed!");
-                            } catch (IOException e) {
-                                Iris.reportError(e);
-                                e.printStackTrace();
-                                Iris.error("ERROR! CONFIGURATION IMPOSSIBLE TO READ! Using an unmodifiable configuration from memory. Please delete the settings.json at some point to try to restore configurability!");
-                            }
-                        }
-                    });
+                    try {
+                        IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 } catch (Throwable ee) {
                     Iris.reportError(ee);
                     Iris.error("Configuration Error in settings.json! " + ee.getClass().getSimpleName() + ": " + ee.getMessage());
-                    Iris.warn("Attempting to fix configuration while retaining valid in-memory settings...");
-
-                    try {
-                        IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
-                        Iris.info("Configuration Fixed!");
-                    } catch (IOException e) {
-                        Iris.reportError(e);
-                        e.printStackTrace();
-                        Iris.error("ERROR! CONFIGURATION IMPOSSIBLE TO READ! Using an unmodifiable configuration from memory. Please delete the settings.json at some point to try to restore configurability!");
-                    }
                 }
             }
 
@@ -237,5 +105,90 @@ public class IrisSettings {
         synchronized (settings) {
             settings = null;
         }
+    }
+
+    public boolean isStudio() {
+        return getStudio().isStudio();
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public boolean isUseServerLaunchedGuis() {
+        return getGui().isUseServerLaunchedGuis();
+    }
+
+    public long getParallaxRegionEvictionMS() {
+        return getParallax().getParallaxRegionEvictionMS();
+    }
+
+    public void forceSave() {
+        File s = Iris.instance.getDataFile("settings.json");
+
+        try {
+            IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
+        } catch (JSONException | IOException e) {
+            e.printStackTrace();
+            Iris.reportError(e);
+        }
+    }
+
+    @Data
+    public static class IrisSettingsCache {
+        public int complexCacheSize = 131072;
+    }
+
+    @Data
+    public static class IrisSettingsConcurrency {
+        public int parallelism = -1;
+    }
+
+    @Data
+    public static class IrisSettingsParallax {
+        public int parallaxRegionEvictionMS = 15000;
+        public int parallaxChunkEvictionMS = 5000;
+    }
+
+    @Data
+    public static class IrisSettingsGeneral {
+        public boolean commandSounds = true;
+        public boolean debug = false;
+        public boolean ignoreWorldEdit = false;
+        public boolean disableNMS = false;
+        public boolean keepProductionOnReload = false;
+        public boolean pluginMetrics = true;
+        public boolean splashLogoStartup = true;
+        public boolean autoStartDefaultStudio = false;
+        public boolean useConsoleCustomColors = true;
+        public boolean useCustomColorsIngame = true;
+        public String forceMainWorld = "";
+        public int spinh = -20;
+        public int spins = 7;
+        public int spinb = 8;
+
+        public boolean canUseCustomColors(VolmitSender volmitSender) {
+            return (volmitSender.isPlayer() && useCustomColorsIngame) || (!volmitSender.isPlayer() && useConsoleCustomColors);
+        }
+    }
+
+    @Data
+    public static class IrisSettingsGUI {
+        public boolean useServerLaunchedGuis = true;
+        public boolean maximumPregenGuiFPS = false;
+        public boolean localPregenGui = true;
+    }
+
+    @Data
+    public static class IrisSettingsGenerator {
+        public String defaultWorldType = "overworld";
+        public boolean headlessPregeneration = false;
+        public boolean systemEffects = true;
+        public int maxBiomeChildDepth = 4;
+        public boolean preventLeafDecay = true;
+    }
+
+    @Data
+    public static class IrisSettingsStudio {
+        public boolean studio = true;
+        public boolean openVSCode = true;
+        public boolean disableTimeAndWeather = true;
     }
 }

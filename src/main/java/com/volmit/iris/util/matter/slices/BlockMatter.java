@@ -18,13 +18,8 @@
 
 package com.volmit.iris.util.matter.slices;
 
-import com.volmit.iris.engine.parallax.ParallaxAccess;
-import com.volmit.iris.engine.parallax.ParallaxWorld;
 import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.matter.Sliced;
-import com.volmit.iris.util.nbt.io.NBTUtil;
-import com.volmit.iris.util.nbt.mca.NBTWorld;
-import com.volmit.iris.util.nbt.tag.CompoundTag;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 
@@ -40,10 +35,11 @@ public class BlockMatter extends RawMatter<BlockData> {
 
     public BlockMatter(int width, int height, int depth) {
         super(width, height, depth, BlockData.class);
-        registerWriter(World.class, ((w, d, x, y, z) -> w.getBlockAt(x,y,z).setBlockData(d)));
-        registerWriter(ParallaxWorld.class, (w, d, x, y, z) -> w.setBlock(x,y,z,d));
-        registerReader(World.class, (w, x, y, z) -> w.getBlockAt(x,y,z).getBlockData());
-        registerReader(ParallaxWorld.class, ParallaxAccess::getBlock);
+        registerWriter(World.class, ((w, d, x, y, z) -> w.getBlockAt(x, y, z).setBlockData(d)));
+        registerReader(World.class, (w, x, y, z) -> {
+            BlockData d = w.getBlockAt(x, y, z).getBlockData();
+            return d.getMaterial().isAir() ? null : d;
+        });
     }
 
     @Override

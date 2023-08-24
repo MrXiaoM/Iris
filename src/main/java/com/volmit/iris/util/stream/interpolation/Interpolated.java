@@ -18,7 +18,7 @@
 
 package com.volmit.iris.util.stream.interpolation;
 
-import com.volmit.iris.engine.object.common.CaveResult;
+import com.volmit.iris.engine.object.CaveResult;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.stream.ProceduralStream;
@@ -32,22 +32,11 @@ public interface Interpolated<T> {
     Interpolated<KList<CaveResult>> CAVE_RESULTS = of((t) -> 0D, (t) -> null);
     Interpolated<RNG> RNG = of((t) -> 0D, (t) -> null);
     Interpolated<Double> DOUBLE = of((t) -> t, (t) -> t);
+    Interpolated<Double[]> DOUBLE_ARRAY = of((t) -> 0D, (t) -> new Double[2]);
     Interpolated<Boolean> BOOLEAN = of((t) -> 0D, (t) -> false);
     Interpolated<Integer> INT = of(Double::valueOf, Double::intValue);
     Interpolated<Long> LONG = of(Double::valueOf, Double::longValue);
     Interpolated<UUID> UUID = of((i) -> Double.longBitsToDouble(i.getMostSignificantBits()), (i) -> new UUID(Double.doubleToLongBits(i), i.longValue()));
-
-    double toDouble(T t);
-
-    T fromDouble(double d);
-
-    default InterpolatorFactory<T> interpolate() {
-        if (this instanceof ProceduralStream) {
-            return new InterpolatorFactory<>((ProceduralStream<T>) this);
-        }
-
-        return null;
-    }
 
     static <T> Interpolated<T> of(Function<T, Double> a, Function<Double, T> b) {
         return new Interpolated<>() {
@@ -61,5 +50,17 @@ public interface Interpolated<T> {
                 return b.apply(d);
             }
         };
+    }
+
+    double toDouble(T t);
+
+    T fromDouble(double d);
+
+    default InterpolatorFactory<T> interpolate() {
+        if (this instanceof ProceduralStream) {
+            return new InterpolatorFactory<>((ProceduralStream<T>) this);
+        }
+
+        return null;
     }
 }

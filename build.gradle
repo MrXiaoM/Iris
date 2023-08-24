@@ -15,83 +15,45 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "com.guardsquare:proguard-gradle:7.1.0"
-    }
-}
-
 plugins {
     id "java"
     id "io.freefair.lombok" version "5.2.1"
     id "com.github.johnrengelman.shadow" version "7.0.0"
 }
 
-group "com.volmit.iris"
-version "1.6.2"
-def apiVersion = "1.16"
-def name = "Iris"
-def main = "com.volmit.iris.Iris"
+group 'com.volmit.iris'
+version '1.8.7'
+def apiVersion = '1.16'
+def name = getRootProject().getName() // Defined in settings.gradle
+def main = 'com.volmit.iris.Iris'
 
 // ADD YOURSELF AS A NEW LINE IF YOU WANT YOUR OWN BUILD TASK GENERATED
 // ==============================================================
-//registerCustomOutputTask("Cyberpwn", "C://Users/cyberpwn/Documents/development/server/plugins");
-//registerCustomOutputTask("Psycho", "D://Dan/MinecraftDevelopment/server/plugins");
-//registerCustomOutputTask("ArcaneArts", "C://Users/arcane/Documents/development/server/plugins");
-//registerCustomOutputTask("Coco", "C:/Users/sjoer/Documents/Development/MCServer/plugins");
-//registerCustomOutputTask("Strange", "D://Servers/1.17 Test Server/plugins");
+//registerCustomOutputTask('Cyberpwn', 'C://Users/cyberpwn/Documents/development/server/plugins', name)
+//registerCustomOutputTask('Psycho', 'D://Dan/MinecraftDevelopment/server/plugins', name)
+//registerCustomOutputTask('ArcaneArts', 'C://Users/arcane/Documents/development/server/plugins', name)
+//registerCustomOutputTask('Coco', 'C://Users/sjoer/Desktop/MCSM/plugins', name)
+//registerCustomOutputTask('Strange', 'D://Servers/1.17 Test Server/plugins', name)
 // ==============================================================
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-}
-
-def dependsDir = "${buildDir}/libs/dependencies/"
-
-task copyDepends(type: Copy) {
-    dependsOn(":shadowJar")
-    group("proguard")
-    from configurations.default
-    into "${dependsDir}"
-}
-
-task release(type: proguard.gradle.ProGuardTask) {
-    dependsOn(":copyDepends")
-    group("proguard")
-    configuration "proguard.pro"
-    injars("${buildDir}/libs/" + name + "-" + version + "-all.jar")
-    outjars("${buildDir}/production/" + name + "/" + version + "/" + name + "-" + version + ".jar")
-    libraryjars "${System.getProperty("java.home")}/lib/rt.jar"
-    libraryjars "${System.getProperty("java.home")}/jmods/"
-    libraryjars "${dependsDir}"
-    dontobfuscate()
-    dontwarn()
-    dontshrink()
-    dontoptimize()
-    dontnote()
-    verbose()
-}
-
-def registerCustomOutputTask(name, path) {
-    tasks.register("build" + name, Copy) {
-        group("development")
+def registerCustomOutputTask(name, path, plugin) {
+    tasks.register('build' + name, Copy) {
+        group('development')
         outputs.upToDateWhen { false }
-        dependsOn ":shadowJar"
-        from(file("build/libs/Iris-" + version + "-all.jar"))
+        dependsOn ':shadowJar'
+        from(file('build/libs/' + plugin + '-' + version + '-all.jar'))
         into(file(path))
         rename { String fileName ->
-            fileName.replace("Iris-" + version + "-all.jar", "Iris.jar")
+            fileName.replace(plugin + '-' + version + '-all.jar', plugin + ".jar")
         }
     }
 }
 
 file(jar.archiveFile.get().getAsFile().getParentFile().getParentFile().getParentFile().getAbsolutePath() + "/build/resources/main/plugin.yml").delete()
 
+/**
+ * Expand properties into plugin yml
+ */
 processResources {
     filesMatching("**/plugin.yml") {
         expand(
@@ -103,49 +65,131 @@ processResources {
     }
 }
 
+/**
+ * For performance during compilation, we specify which module groups are accessible from which repositories
+ * This may cause issues resolving new dependencies but normally it shouldn't.
+ */
 repositories {
-    mavenLocal()
-    mavenCentral()
-    maven { url = "https://maven.fastmirror.net/repositories/minecraft" }
-    maven { url = "https://mvn.lumine.io/repository/maven/" }
-    maven { url = "https://repo.codemc.io/repository/maven-public/" }
     maven {
-        name = "spigotmc-repo"
-        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
+        url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+        content {
+            includeGroup 'org.spigotmc'
+        }
     }
+    maven {
+        url 'https://papermc.io/repo/repository/maven-public/'
+        content {
+            includeGroup 'io.papermc'
+        }
+    }
+    maven {
+        url 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+        content {
+            includeGroup 'me.clip'
+        }
+    }
+    maven {
+        url 'https://oss.sonatype.org/content/repositories/snapshots/'
+        content {
+            includeGroup 'net.kyori'
+        }
+    }
+    maven {
+        url 'https://repo.jeff-media.de/maven2'
+        content {
+            includeGroup 'de.jeff_media'
+        }
+    }
+    maven { url 'https://jitpack.io' }
+    maven {
+        url 'https://repo.codemc.io/repository/maven-releases'
+        content {
+            includeGroup 'com.dfsek'
+        }
+    }
+    mavenCentral()
+    mavenLocal()
+    maven {
+        allowInsecureProtocol true
+        url 'http://archive.arcane.art/repository/arcane'
+        content {
+            includeGroup 'org.bukkit.craftbukkit'
+            includeGroup 'io.th0rgal'
+        }
+    }
+
+    // Uncomment this line if the build is failing because of missing dependencies
+    // Its slow but it will resolve any cached dependencies until we can find an alternative repo
+    // maven { allowInsecureProtocol true, url 'http://archive.arcane.art/repository/arcane'}
 }
 
+/**
+ * We need parameter meta for the decree command system
+ */
+compileJava {
+    options.compilerArgs << '-parameters'
+}
+
+/**
+ * Configure Iris for shading
+ */
 shadowJar {
-    append("plugin.yml")
     minimize()
-    relocate "com.dfsek.paralithic", "com.volmit.iris.util.paralithic"
-    relocate "io.papermc.lib", "com.volmit.iris.util.paper"
+    append("plugin.yml")
+    relocate 'com.dfsek.paralithic', 'com.volmit.iris.util.paralithic'
+    relocate 'io.papermc.lib', 'com.volmit.iris.util.paper'
+    relocate 'net.kyori', 'com.volmit.iris.util.kyori'
     dependencies {
-        include(dependency("io.papermc:paperlib:1.0.5"))
-        include(dependency("com.dfsek:Paralithic:0.4.0"))
+        include(dependency('io.papermc:paperlib'))
+        include(dependency('com.dfsek:Paralithic'))
+        include(dependency('net.kyori:'))
     }
 }
 
-manifest()
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 60, 'minutes'
+    resolutionStrategy.cacheDynamicVersionsFor 60, 'minutes'
+}
 
+/**
+ * Dependencies.
+ *
+ * Provided or classpath dependencies are not shaded and are available on the runtime classpath
+ *
+ * Shaded dependencies are not available at runtime, nor are they available on mvn central so they
+ * need to be shaded into the jar (increasing binary size)
+ *
+ * Dynamically loaded dependencies are defined in the plugin.yml (updating these must be updated in the
+ * plugin.yml also, otherwise they wont be available). These do not increase binary size). Only declare
+ * these dependencies if they are available on mvn central.
+ */
 dependencies {
     // Provided or Classpath
-    compileOnly "org.projectlombok:lombok:1.18.20"
-    annotationProcessor "org.projectlombok:lombok:1.18.20"
-    implementation "org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT"
-    implementation "org.bukkit:craftbukkit:1.16.5-R0.1-SNAPSHOT"
-    implementation "com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT"
-    implementation "me.clip:placeholderapi:2.10.10"
+    compileOnly 'org.projectlombok:lombok:1.18.20'
+    annotationProcessor 'org.projectlombok:lombok:1.18.20'
+    implementation 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    implementation 'org.bukkit:craftbukkit:1.16.5-R0.1-SNAPSHOT'
+    implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT'
+    implementation 'me.clip:placeholderapi:2.10.10'
+    implementation 'io.th0rgal:oraxen:1.94.0'
 
     // Shaded
-    implementation "com.dfsek:Paralithic:0.4.0"
-    implementation "io.papermc:paperlib:1.0.5"
+    implementation 'com.dfsek:Paralithic:0.4.0'
+    implementation 'io.papermc:paperlib:1.0.5'
+    implementation "net.kyori:adventure-text-minimessage:4.2.0-SNAPSHOT"
+    implementation "net.kyori:adventure-platform-bukkit:4.0.0-SNAPSHOT"
+    implementation 'net.kyori:adventure-api:4.9.1'
 
     // Dynamically Loaded
-    implementation "it.unimi.dsi:fastutil:8.5.4"
-    implementation "com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:1.4.2"
-    implementation "org.zeroturnaround:zt-zip:1.14"
-    implementation "com.google.code.gson:gson:2.8.5"
-    implementation "org.ow2.asm:asm:9.0"
-    implementation "com.google.guava:guava:30.1.1-jre"
+    implementation 'io.timeandspace:smoothie-map:2.0.2'
+    implementation 'it.unimi.dsi:fastutil:8.5.4'
+    implementation 'com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:1.4.2'
+    implementation 'org.zeroturnaround:zt-zip:1.14'
+    implementation 'com.google.code.gson:gson:2.8.8'
+    implementation 'org.ow2.asm:asm:9.2'
+    implementation 'com.google.guava:guava:30.1.1-jre'
+    implementation 'bsf:bsf:2.4.0'
+    implementation 'rhino:js:1.7R2'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.0.3'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
 }

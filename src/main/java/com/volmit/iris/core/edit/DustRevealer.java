@@ -19,54 +19,45 @@
 package com.volmit.iris.core.edit;
 
 import com.volmit.iris.Iris;
-import com.volmit.iris.core.tools.IrisWorlds;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.parallax.ParallaxAccess;
+import com.volmit.iris.core.tools.IrisToolbelt;
+import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.math.BlockPosition;
+import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.plugin.VolmitSender;
 import com.volmit.iris.util.scheduling.J;
 import lombok.Data;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
 @SuppressWarnings("ALL")
 @Data
 public class DustRevealer {
-    private final ParallaxAccess parallax;
+    private final Engine engine;
     private final World world;
     private final BlockPosition block;
     private final String key;
     private final KList<BlockPosition> hits;
 
-    public static void spawn(Block block, VolmitSender sender) {
-        World world = block.getWorld();
-        IrisAccess access = IrisWorlds.access(world);
-
-        if (access != null) {
-            ParallaxAccess a = access.getEngineAccess(block.getY()).getParallaxAccess();
-
-            if (a.getObject(block.getX(), block.getY(), block.getZ()) != null) {
-                sender.sendMessage("Found object " + a.getObject(block.getX(), block.getY(), block.getZ()));
-                Iris.info(sender.getName() + " found object " + a.getObject(block.getX(), block.getY(), block.getZ()));
-                J.a(() -> {
-                    new DustRevealer(a, world, new BlockPosition(block.getX(), block.getY(), block.getZ()), a.getObject(block.getX(), block.getY(), block.getZ()), new KList<>());
-                });
-            }
-        }
-    }
-
-    public DustRevealer(ParallaxAccess parallax, World world, BlockPosition block, String key, KList<BlockPosition> hits) {
-        this.parallax = parallax;
+    public DustRevealer(Engine engine, World world, BlockPosition block, String key, KList<BlockPosition> hits) {
+        this.engine = engine;
         this.world = world;
         this.block = block;
         this.key = key;
         this.hits = hits;
 
         J.s(() -> {
-            new BlockSignal(world.getBlockAt(block.getX(), block.getY(), block.getZ()), 100);
+            new BlockSignal(world.getBlockAt(block.getX(), block.getY(), block.getZ()), 7);
+            if (M.r(0.25)) {
+                world.playSound(block.toBlock(world).getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1f, RNG.r.f(0.2f, 2f));
+            }
             J.a(() -> {
+                while (BlockSignal.active.get() > 128) {
+                    J.sleep(5);
+                }
+
                 try {
                     is(new BlockPosition(block.getX() + 1, block.getY(), block.getZ()));
                     is(new BlockPosition(block.getX() - 1, block.getY(), block.getZ()));
@@ -99,13 +90,31 @@ public class DustRevealer {
                     e.printStackTrace();
                 }
             });
-        }, RNG.r.i(3, 6));
+        }, RNG.r.i(2, 8));
+    }
+
+    public static void spawn(Block block, VolmitSender sender) {
+        World world = block.getWorld();
+        Engine access = IrisToolbelt.access(world).getEngine();
+
+        if (access != null) {
+            String a = access.getObjectPlacementKey(block.getX(), block.getY(), block.getZ());
+
+            if (a != null) {
+                world.playSound(block.getLocation(), Sound.ITEM_LODESTONE_COMPASS_LOCK, 1f, 0.1f);
+
+                sender.sendMessage("Found object " + a);
+                J.a(() -> {
+                    new DustRevealer(access, world, new BlockPosition(block.getX(), block.getY(), block.getZ()), a, new KList<>());
+                });
+            }
+        }
     }
 
     private boolean is(BlockPosition a) {
-        if (isValidTry(a) && parallax.getObject(a.getX(), a.getY(), a.getZ()) != null && parallax.getObject(a.getX(), a.getY(), a.getZ()).equals(key)) {
+        if (isValidTry(a) && engine.getObjectPlacementKey(a.getX(), a.getY(), a.getZ()) != null && engine.getObjectPlacementKey(a.getX(), a.getY(), a.getZ()).equals(key)) {
             hits.add(a);
-            new DustRevealer(parallax, world, a, key, hits);
+            new DustRevealer(engine, world, a, key, hits);
             return true;
         }
 

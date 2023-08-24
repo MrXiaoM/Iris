@@ -19,10 +19,12 @@
 package com.volmit.iris.util.scheduling;
 
 import com.volmit.iris.Iris;
+import com.volmit.iris.core.service.PreservationSVC;
 
 public abstract class Looper extends Thread {
     @SuppressWarnings("BusyWait")
     public void run() {
+        Iris.service(PreservationSVC.class).register(this);
         while (!interrupted()) {
             try {
                 long m = loop();
@@ -42,7 +44,7 @@ public abstract class Looper extends Thread {
             }
         }
 
-        Iris.info("Thread " + getName() + " Shutdown. Pregen stopped / finished.");
+        Iris.debug("Iris Thread " + getName() + " Shutdown.");
     }
 
     protected abstract long loop();

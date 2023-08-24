@@ -20,7 +20,7 @@ package com.volmit.iris.engine.actuator;
 
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedActuator;
-import com.volmit.iris.engine.object.biome.IrisBiome;
+import com.volmit.iris.engine.object.IrisBiome;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.documentation.BlockCoordinates;
 import com.volmit.iris.util.hunk.Hunk;
@@ -34,19 +34,16 @@ import org.bukkit.block.data.BlockData;
 public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData> {
     private static final BlockData AIR = Material.AIR.createBlockData();
     private static final BlockData BEDROCK = Material.BEDROCK.createBlockData();
+    private static final BlockData GLASS = Material.GLASS.createBlockData();
     private static final BlockData CAVE_AIR = Material.CAVE_AIR.createBlockData();
     @Getter
     private final RNG rng;
-    private final boolean carving;
-    private final boolean hasUnder;
     @Getter
     private int lastBedrock = -1;
 
     public IrisTerrainNormalActuator(Engine engine) {
         super(engine, "Terrain");
-        rng = new RNG(engine.getWorld().seed());
-        carving = getDimension().isCarving() && getDimension().getCarveLayers().isNotEmpty();
-        hasUnder = getDimension().getUndercarriage() != null && !getDimension().getUndercarriage().getGenerator().isFlat();
+        rng = new RNG(engine.getSeedManager().getTerrain());
     }
 
     @BlockCoordinates
@@ -54,21 +51,19 @@ public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData>
     public void onActuate(int x, int z, Hunk<BlockData> h, boolean multicore) {
         PrecisionStopwatch p = PrecisionStopwatch.start();
 
-        if (multicore) {
-            BurstExecutor e = getEngine().burst().burst(h.getWidth());
-            for (int xf = 0; xf < h.getWidth(); xf++) {
-                int finalXf = xf;
-                e.queue(() -> terrainSliver(x, z, finalXf, h));
-            }
-
-            e.complete();
-        } else {
-            for (int xf = 0; xf < h.getWidth(); xf++) {
-                terrainSliver(x, z, xf, h);
-            }
+        BurstExecutor e = burst().burst(multicore);
+        for (int xf = 0; xf < h.getWidth(); xf++) {
+            int finalXf = xf;
+            e.queue(() -> terrainSliver(x, z, finalXf, h));
         }
 
+        e.complete();
+
         getEngine().getMetrics().getTerrain().put(p.getMilliseconds());
+    }
+
+    private int fluidOrHeight(int height) {
+        return Math.max(getDimension().getFluidHeight(), height);
     }
 
     /**
@@ -81,43 +76,35 @@ public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData>
      */
     @BlockCoordinates
     public void terrainSliver(int x, int z, int xf, Hunk<BlockData> h) {
-        int i, depth, realX, realZ, hf, he, b, fdepth;
+        int zf, realX, realZ, hf, he;
         IrisBiome biome;
-        KList<BlockData> blocks, fblocks;
 
-        for (int zf = 0; zf < h.getDepth(); zf++) {
+        for (zf = 0; zf < h.getDepth(); zf++) {
             realX = (int) modX(xf + x);
             realZ = (int) modZ(zf + z);
-            b = hasUnder ? (int) Math.round(getDimension().getUndercarriage().get(rng, getData(), realX, realZ)) : 0;
+            biome = getComplex().getTrueBiomeStream().get(realX, realZ);
             he = (int) Math.round(Math.min(h.getHeight(), getComplex().getHeightStream().get(realX, realZ)));
             hf = Math.round(Math.max(Math.min(h.getHeight(), getDimension().getFluidHeight()), he));
-            biome = getComplex().getTrueBiomeStream().get(realX, realZ);
-            blocks = null;
-            fblocks = null;
 
-            if (hf < b) {
+            if (hf < 0) {
                 continue;
             }
 
-            for (i = hf; i >= b; i--) {
+            KList<BlockData> blocks = null;
+            KList<BlockData> fblocks = null;
+            int depth, fdepth;
+
+            for (int i = hf; i >= 0; i--) {
                 if (i >= h.getHeight()) {
                     continue;
                 }
 
-                if (i == b) {
+                if (i == 0) {
                     if (getDimension().isBedrock()) {
                         h.set(xf, i, zf, BEDROCK);
                         lastBedrock = i;
                         continue;
                     }
-                }
-
-                if (carving && getDimension().isCarved(getData(), realX, i, realZ, rng, he)) {
-                    continue;
-                }
-
-                if (getDimension().getCaverns() != null && getDimension().getCaverns().isCavern(rng, realX, i, realZ, he, getData())) {
-                    continue;
                 }
 
                 if (i > he && i <= hf) {
@@ -139,7 +126,11 @@ public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData>
                 if (i <= he) {
                     depth = he - i;
                     if (blocks == null) {
-                        blocks = biome.generateLayers(realX, realZ, rng, he, he, getData(), getComplex());
+                        blocks = biome.generateLayers(getDimension(), realX, realZ, rng,
+                                he,
+                                he,
+                                getData(),
+                                getComplex());
                     }
 
                     if (blocks.hasIndex(depth)) {

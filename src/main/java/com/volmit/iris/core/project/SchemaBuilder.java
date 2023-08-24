@@ -19,9 +19,20 @@
 package com.volmit.iris.core.project;
 
 import com.volmit.iris.Iris;
-import com.volmit.iris.core.project.loader.IrisData;
-import com.volmit.iris.core.project.loader.ResourceLoader;
-import com.volmit.iris.engine.object.annotations.*;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.core.loader.IrisRegistrant;
+import com.volmit.iris.core.loader.ResourceLoader;
+import com.volmit.iris.engine.object.annotations.ArrayType;
+import com.volmit.iris.engine.object.annotations.Desc;
+import com.volmit.iris.engine.object.annotations.MaxNumber;
+import com.volmit.iris.engine.object.annotations.MinNumber;
+import com.volmit.iris.engine.object.annotations.RegistryListBlockType;
+import com.volmit.iris.engine.object.annotations.RegistryListFont;
+import com.volmit.iris.engine.object.annotations.RegistryListItemType;
+import com.volmit.iris.engine.object.annotations.RegistryListResource;
+import com.volmit.iris.engine.object.annotations.RegistryListSpecialEntity;
+import com.volmit.iris.engine.object.annotations.Required;
+import com.volmit.iris.engine.object.annotations.Snippet;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.data.B;
@@ -30,7 +41,7 @@ import com.volmit.iris.util.json.JSONObject;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.potion.PotionEffectType;
 
-import java.awt.*;
+import java.awt.GraphicsEnvironment;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.List;
@@ -54,6 +65,26 @@ public class SchemaBuilder {
         warnings = new KList<>();
         this.definitions = new KMap<>();
         this.root = root;
+    }
+
+    private static JSONArray getEnchantmentTypes() {
+        JSONArray a = new JSONArray();
+
+        for (Field gg : Enchantment.class.getDeclaredFields()) {
+            a.put(gg.getName());
+        }
+
+        return a;
+    }
+
+    private static JSONArray getPotionTypes() {
+        JSONArray a = new JSONArray();
+
+        for (PotionEffectType gg : PotionEffectType.values()) {
+            a.put(gg.getName().toUpperCase().replaceAll("\\Q \\E", "_"));
+        }
+
+        return a;
     }
 
     public JSONObject compute() {
@@ -91,6 +122,25 @@ public class SchemaBuilder {
         o.put("type", getType(c));
         JSONArray required = new JSONArray();
 
+        if (c.isAssignableFrom(IrisRegistrant.class) || IrisRegistrant.class.isAssignableFrom(c)) {
+            for (Field k : IrisRegistrant.class.getDeclaredFields()) {
+                k.setAccessible(true);
+
+                if (Modifier.isStatic(k.getModifiers()) || Modifier.isFinal(k.getModifiers()) || Modifier.isTransient(k.getModifiers())) {
+                    continue;
+                }
+
+                JSONObject property = buildProperty(k, c);
+
+                if (property.getBoolean("!required")) {
+                    required.put(k.getName());
+                }
+
+                property.remove("!required");
+                properties.put(k.getName(), property);
+            }
+        }
+
         for (Field k : c.getDeclaredFields()) {
             k.setAccessible(true);
 
@@ -99,10 +149,6 @@ public class SchemaBuilder {
             }
 
             JSONObject property = buildProperty(k, c);
-
-            if (property.getBoolean("!required")) {
-                required.put(k.getName());
-            }
 
             property.remove("!required");
             properties.put(k.getName(), property);
@@ -113,6 +159,19 @@ public class SchemaBuilder {
         }
 
         o.put("properties", properties);
+
+
+        if (c.isAnnotationPresent(Snippet.class)) {
+            JSONObject anyOf = new JSONObject();
+            JSONArray arr = new JSONArray();
+            JSONObject str = new JSONObject();
+            str.put("type", "string");
+            arr.put(o);
+            arr.put(str);
+            anyOf.put("anyOf", arr);
+
+            return anyOf;
+        }
 
         return o;
     }
@@ -518,40 +577,76 @@ public class SchemaBuilder {
         d.add(fancyType);
         d.add(getDescription(k.getType()));
 
+        if (k.getType().isAnnotationPresent(Snippet.class)) {
+            String sm = k.getType().getDeclaredAnnotation(Snippet.class).value();
+            d.add("    ");
+            d.add("You can instead specify \"snippet/" + sm + "/some-name.json\" to use a snippet file instead of specifying it here.");
+        }
+
         try {
             k.setAccessible(true);
             Object value = k.get(cl.newInstance());
 
             if (value != null) {
                 if (value instanceof List) {
+                    d.add("    ");
                     d.add("* Default Value is an empty list");
                 } else if (!cl.isPrimitive() && !(value instanceof Number) && !(value instanceof String) && !(cl.isEnum())) {
+                    d.add("    ");
                     d.add("* Default Value is a default object (create this object to see default properties)");
                 } else {
+                    d.add("    ");
                     d.add("* Default Value is " + value);
                 }
             }
-        } catch (Throwable e) {
-            Iris.reportError(e);
+        } catch (Throwable ignored) {
+
         }
 
         description.forEach((g) -> d.add(g.trim()));
         prop.put("type", type);
         prop.put("description", d.toString("\n"));
 
+        if (k.getType().isAnnotationPresent(Snippet.class)) {
+            JSONObject anyOf = new JSONObject();
+            JSONArray arr = new JSONArray();
+            JSONObject str = new JSONObject();
+            str.put("type", "string");
+            String key = "enum-snippet-" + k.getType().getDeclaredAnnotation(Snippet.class).value();
+            str.put("$ref", "#/definitions/" + key);
+
+            if (!definitions.containsKey(key)) {
+                JSONObject j = new JSONObject();
+                JSONArray snl = new JSONArray();
+                data.getPossibleSnippets(k.getType().getDeclaredAnnotation(Snippet.class).value()).forEach(snl::put);
+                j.put("enum", snl);
+                definitions.put(key, j);
+            }
+
+            arr.put(prop);
+            arr.put(str);
+            prop.put("description", d.toString("\n"));
+            str.put("description", d.toString("\n"));
+            anyOf.put("anyOf", arr);
+            anyOf.put("description", d.toString("\n"));
+            anyOf.put("!required", k.isAnnotationPresent(Required.class));
+
+            return anyOf;
+        }
+
         return prop;
     }
 
     private String getType(Class<?> c) {
-        if (c.equals(int.class) || c.equals(Integer.class) || c.equals(long.class)) {
+        if (c.equals(int.class) || c.equals(Integer.class) || c.equals(long.class) || c.equals(Long.class)) {
             return "integer";
         }
 
-        if (c.equals(float.class) || c.equals(double.class)) {
+        if (c.equals(float.class) || c.equals(double.class) || c.equals(Float.class) || c.equals(Double.class)) {
             return "number";
         }
 
-        if (c.equals(boolean.class)) {
+        if (c.equals(boolean.class) || c.equals(Boolean.class)) {
             return "boolean";
         }
 
@@ -567,7 +662,7 @@ public class SchemaBuilder {
             return "object";
         }
 
-        if (!c.isAnnotationPresent(Desc.class)) {
+        if (!c.isAnnotationPresent(Desc.class) && c.getCanonicalName().startsWith("com.volmit.iris.")) {
             warnings.addIfMissing("Unsupported Type: " + c.getCanonicalName() + " Did you forget @Desc?");
         }
 
@@ -575,8 +670,14 @@ public class SchemaBuilder {
     }
 
     private String getFieldDescription(Field r) {
+
         if (r.isAnnotationPresent(Desc.class)) {
             return r.getDeclaredAnnotation(Desc.class).value();
+        }
+
+        // suppress warnings on bukkit classes
+        if (r.getDeclaringClass().getName().startsWith("org.bukkit.")) {
+            return "Bukkit package classes and enums have no descriptions";
         }
 
         warnings.addIfMissing("Missing @Desc on field " + r.getName() + " (" + r.getType() + ") in " + r.getDeclaringClass().getCanonicalName());
@@ -592,25 +693,5 @@ public class SchemaBuilder {
             warnings.addIfMissing("Missing @Desc on " + r.getSimpleName() + " in " + r.getDeclaringClass().getCanonicalName());
         }
         return "";
-    }
-
-    private static JSONArray getEnchantmentTypes() {
-        JSONArray a = new JSONArray();
-
-        for (Field gg : Enchantment.class.getDeclaredFields()) {
-            a.put(gg.getName());
-        }
-
-        return a;
-    }
-
-    private static JSONArray getPotionTypes() {
-        JSONArray a = new JSONArray();
-
-        for (PotionEffectType gg : PotionEffectType.values()) {
-            a.put(gg.getName().toUpperCase().replaceAll("\\Q \\E", "_"));
-        }
-
-        return a;
     }
 }

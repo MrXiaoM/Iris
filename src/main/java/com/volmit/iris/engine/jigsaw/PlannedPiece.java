@@ -18,21 +18,20 @@
 
 package com.volmit.iris.engine.jigsaw;
 
-import com.volmit.iris.Iris;
-import com.volmit.iris.core.project.loader.IrisData;
-import com.volmit.iris.core.tools.IrisWorlds;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.core.tools.IrisToolbelt;
 import com.volmit.iris.engine.framework.Engine;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.object.basic.IrisPosition;
-import com.volmit.iris.engine.object.common.IObjectPlacer;
-import com.volmit.iris.engine.object.jigsaw.IrisJigsawPiece;
-import com.volmit.iris.engine.object.jigsaw.IrisJigsawPieceConnector;
-import com.volmit.iris.engine.object.loot.IrisLootTable;
-import com.volmit.iris.engine.object.meta.InventorySlotType;
-import com.volmit.iris.engine.object.objects.IrisObject;
-import com.volmit.iris.engine.object.objects.IrisObjectRotation;
-import com.volmit.iris.engine.object.objects.IrisObjectTranslate;
-import com.volmit.iris.engine.object.tile.TileData;
+import com.volmit.iris.engine.object.IObjectPlacer;
+import com.volmit.iris.engine.object.InventorySlotType;
+import com.volmit.iris.engine.object.IrisJigsawPiece;
+import com.volmit.iris.engine.object.IrisJigsawPieceConnector;
+import com.volmit.iris.engine.object.IrisLootTable;
+import com.volmit.iris.engine.object.IrisObject;
+import com.volmit.iris.engine.object.IrisObjectRotation;
+import com.volmit.iris.engine.object.IrisObjectTranslate;
+import com.volmit.iris.engine.object.IrisPosition;
+import com.volmit.iris.engine.object.TileData;
+import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.math.AxisAlignedBB;
 import com.volmit.iris.util.math.BlockPosition;
@@ -151,13 +150,13 @@ public class PlannedPiece {
     }
 
     public void place(World world) {
-        IrisAccess a = IrisWorlds.access(world);
+        PlatformChunkGenerator a = IrisToolbelt.access(world);
 
         int minY = 0;
         if (a != null) {
-            minY = a.getCompound().getDefaultEngine().getMinHeight();
+            minY = a.getEngine().getMinHeight();
 
-            if (!a.getCompound().getRootDimension().isBedrock())
+            if (!a.getEngine().getDimension().isBedrock())
                 minY--; //If the dimension has no bedrock, allow it to go a block lower
         }
 
@@ -192,7 +191,7 @@ public class PlannedPiece {
 
                     IrisLootTable table = getPiece().getPlacementOptions().getTable(block.getBlockData(), getData());
                     if (table == null) return;
-                    Engine engine = a.getCompound().getEngineForHeight(y);
+                    Engine engine = a.getEngine();
                     engine.addItems(false, ((InventoryHolder) block.getState()).getInventory(),
                             rng.nextParallelRNG(BlockPosition.toLong(x, y, z)),
                             new KList<>(table), InventorySlotType.STORAGE, x, y, z, 15);
@@ -206,6 +205,11 @@ public class PlannedPiece {
 
             @Override
             public boolean isPreventingDecay() {
+                return false;
+            }
+
+            @Override
+            public boolean isCarved(int x, int y, int z) {
                 return false;
             }
 

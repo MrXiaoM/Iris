@@ -22,10 +22,8 @@ import com.volmit.iris.Iris;
 import com.volmit.iris.util.collection.KMap;
 import lombok.Getter;
 
-import java.lang.reflect.InvocationTargetException;
-
 public class IrisMatter implements Matter {
-    private static final KMap<Class<?>, MatterSlice<?>> slicers = buildSlicers();
+    protected static final KMap<Class<?>, MatterSlice<?>> slicers = buildSlicers();
 
     @Getter
     private final MatterHeader header;
@@ -40,7 +38,7 @@ public class IrisMatter implements Matter {
     private final int depth;
 
     @Getter
-    private KMap<Class<?>, MatterSlice<?>> sliceMap;
+    private final KMap<Class<?>, MatterSlice<?>> sliceMap;
 
     public IrisMatter(int width, int height, int depth) {
         this.width = width;
@@ -48,6 +46,16 @@ public class IrisMatter implements Matter {
         this.depth = depth;
         this.header = new MatterHeader();
         this.sliceMap = new KMap<>();
+    }
+
+    private static KMap<Class<?>, MatterSlice<?>> buildSlicers() {
+        KMap<Class<?>, MatterSlice<?>> c = new KMap<>();
+        for (Object i : Iris.initialize("com.volmit.iris.util.matter.slices", Sliced.class)) {
+            MatterSlice<?> s = (MatterSlice<?>) i;
+            c.put(s.getType(), s);
+        }
+
+        return c;
     }
 
     @Override
@@ -65,15 +73,5 @@ public class IrisMatter implements Matter {
         }
 
         return null;
-    }
-
-    private static KMap<Class<?>, MatterSlice<?>> buildSlicers() {
-        KMap<Class<?>, MatterSlice<?>> c = new KMap<>();
-        for (Object i : Iris.initialize("com.volmit.iris.util.matter.slices", Sliced.class)) {
-            MatterSlice<?> s = (MatterSlice<?>) i;
-            c.put(s.getType(), s);
-        }
-
-        return c;
     }
 }

@@ -21,49 +21,92 @@ package com.volmit.iris.engine.framework;
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.gui.components.RenderType;
 import com.volmit.iris.core.gui.components.Renderer;
-import com.volmit.iris.core.project.loader.IrisData;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.engine.IrisComplex;
 import com.volmit.iris.engine.data.cache.Cache;
-import com.volmit.iris.engine.object.basic.IrisColor;
-import com.volmit.iris.engine.object.biome.IrisBiome;
-import com.volmit.iris.engine.object.common.IrisWorld;
-import com.volmit.iris.engine.object.dimensional.IrisDimension;
-import com.volmit.iris.engine.object.engine.IrisEngineData;
-import com.volmit.iris.engine.object.loot.IrisLootMode;
-import com.volmit.iris.engine.object.loot.IrisLootReference;
-import com.volmit.iris.engine.object.loot.IrisLootTable;
-import com.volmit.iris.engine.object.meta.InventorySlotType;
-import com.volmit.iris.engine.object.regional.IrisRegion;
-import com.volmit.iris.engine.parallax.ParallaxAccess;
+import com.volmit.iris.engine.data.chunk.TerrainChunk;
+import com.volmit.iris.engine.mantle.EngineMantle;
+import com.volmit.iris.engine.object.InventorySlotType;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisColor;
+import com.volmit.iris.engine.object.IrisDimension;
+import com.volmit.iris.engine.object.IrisEngineData;
+import com.volmit.iris.engine.object.IrisLootMode;
+import com.volmit.iris.engine.object.IrisLootReference;
+import com.volmit.iris.engine.object.IrisLootTable;
+import com.volmit.iris.engine.object.IrisObjectPlacement;
+import com.volmit.iris.engine.object.IrisPosition;
+import com.volmit.iris.engine.object.IrisRegion;
+import com.volmit.iris.engine.object.IrisWorld;
+import com.volmit.iris.engine.scripting.EngineExecutionEnvironment;
 import com.volmit.iris.util.collection.KList;
+import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.context.IrisContext;
 import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.data.DataProvider;
 import com.volmit.iris.util.documentation.BlockCoordinates;
 import com.volmit.iris.util.documentation.ChunkCoordinates;
+import com.volmit.iris.util.function.Function2;
 import com.volmit.iris.util.hunk.Hunk;
+import com.volmit.iris.util.mantle.MantleFlag;
 import com.volmit.iris.util.math.BlockPosition;
 import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.math.RNG;
+import com.volmit.iris.util.matter.MatterCavern;
+import com.volmit.iris.util.matter.MatterUpdate;
+import com.volmit.iris.util.parallel.BurstExecutor;
 import com.volmit.iris.util.parallel.MultiBurst;
+import com.volmit.iris.util.scheduling.ChronoLatch;
+import com.volmit.iris.util.scheduling.J;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
+import com.volmit.iris.util.stream.ProceduralStream;
+import io.papermc.lib.PaperLib;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.command.CommandSender;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-import java.awt.*;
+import java.awt.Color;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
-public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootProvider, BlockUpdater, Renderer, Hotloadable {
+public interface Engine extends DataProvider, Fallible, LootProvider, BlockUpdater, Renderer, Hotloadable {
+    KList<EngineStage> getStages();
+
+    void registerStage(EngineStage stage);
+
+    IrisComplex getComplex();
+
+    int getBlockUpdatesPerSecond();
+
+    void printMetrics(CommandSender sender);
+
+    EngineMantle getMantle();
+
+    void hotloadSilently();
+
+    void hotloadComplex();
+
+    void recycle();
+
     void close();
 
     IrisContext getContext();
+
+    EngineExecutionEnvironment getExecution();
 
     double getMaxBiomeObjectDensity();
 
@@ -75,25 +118,21 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
 
     EngineWorldManager getWorldManager();
 
-    void setParallelism(int parallelism);
-
     default UUID getBiomeID(int x, int z) {
-        return getFramework().getComplex().getBaseBiomeIDStream().get(x, z);
+        return getComplex().getBaseBiomeIDStream().get(x, z);
     }
 
     int getParallelism();
 
+    void setParallelism(int parallelism);
+
     EngineTarget getTarget();
 
-    EngineFramework getFramework();
+    default int getMinHeight() {
+        return getTarget().getWorld().minHeight();
+    }
 
     void setMinHeight(int min);
-
-    void recycle();
-
-    int getIndex();
-
-    int getMinHeight();
 
     @BlockCoordinates
     double modifyX(double x);
@@ -101,30 +140,33 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
     @BlockCoordinates
     double modifyZ(double z);
 
-    @ChunkCoordinates
-    void generate(int x, int z, Hunk<BlockData> blocks, Hunk<Biome> biomes, boolean multicore);
+    @BlockCoordinates
+    default void generate(int x, int z, TerrainChunk tc, boolean multicore) throws WrongEngineBroException {
+        generate(x, z, Hunk.view((ChunkGenerator.ChunkData) tc), Hunk.view((ChunkGenerator.BiomeGrid) tc), multicore);
+    }
+
+    @BlockCoordinates
+    void generate(int x, int z, Hunk<BlockData> blocks, Hunk<Biome> biomes, boolean multicore) throws WrongEngineBroException;
 
     EngineMetrics getMetrics();
 
     default void save() {
-        getParallax().saveAll();
+        getMantle().save();
         getWorldManager().onSave();
         saveEngineData();
     }
 
     default void saveNow() {
-        getParallax().saveAllNOW();
+        getMantle().saveAllNow();
         saveEngineData();
     }
+
+    SeedManager getSeedManager();
 
     void saveEngineData();
 
     default String getName() {
         return getDimension().getName();
-    }
-
-    default int getHeight() {
-        return getTarget().getHeight();
     }
 
     default IrisData getData() {
@@ -139,17 +181,13 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
         return getTarget().getDimension();
     }
 
-    default ParallaxAccess getParallax() {
-        return getTarget().getParallaxWorld();
-    }
-
     @BlockCoordinates
     default Color draw(double x, double z) {
         IrisRegion region = getRegion((int) x, (int) z);
         IrisBiome biome = getSurfaceBiome((int) x, (int) z);
         int height = getHeight((int) x, (int) z);
-        double heightFactor = M.lerpInverse(0, getHeight(), height);
-        Color irc = region.getColor(this.getFramework().getComplex(), RenderType.BIOME);
+        double heightFactor = M.lerpInverse(0, getTarget().getHeight(), height);
+        Color irc = region.getColor(this.getComplex(), RenderType.BIOME);
         Color ibc = biome.getColor(this, RenderType.BIOME);
         Color rc = irc != null ? irc : Color.GREEN.darker();
         Color bc = ibc != null ? ibc : biome.isAquatic() ? Color.BLUE : Color.YELLOW;
@@ -159,37 +197,43 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
     }
 
     @BlockCoordinates
-    @Override
     default IrisRegion getRegion(int x, int z) {
-        return getFramework().getComplex().getRegionStream().get(x, z);
-    }
-
-    @Override
-    default ParallaxAccess getParallaxAccess() {
-        return getParallax();
+        return getComplex().getRegionStream().get(x, z);
     }
 
     @BlockCoordinates
-    @Override
+    default IrisBiome getCaveOrMantleBiome(int x, int y, int z) {
+        MatterCavern m = getMantle().getMantle().get(x, y, z, MatterCavern.class);
+
+        if (m != null && m.getCustomBiome() != null && !m.getCustomBiome().isEmpty()) {
+            IrisBiome biome = getData().getBiomeLoader().load(m.getCustomBiome());
+
+            if (biome != null) {
+                return biome;
+            }
+        }
+
+        return getCaveBiome(x, z);
+    }
+
+    @BlockCoordinates
     default IrisBiome getCaveBiome(int x, int z) {
-        return getFramework().getComplex().getCaveBiomeStream().get(x, z);
+        return getComplex().getCaveBiomeStream().get(x, z);
     }
 
     @BlockCoordinates
-    @Override
     default IrisBiome getSurfaceBiome(int x, int z) {
-        return getFramework().getComplex().getTrueBiomeStream().get(x, z);
+        return getComplex().getTrueBiomeStream().get(x, z);
     }
 
     @BlockCoordinates
-    @Override
     default int getHeight(int x, int z) {
         return getHeight(x, z, true);
     }
 
     @BlockCoordinates
     default int getHeight(int x, int z, boolean ignoreFluid) {
-        return getFramework().getEngineParallax().getHighest(x, z, getData(), ignoreFluid);
+        return getMantle().getHighest(x, z, getData(), ignoreFluid);
     }
 
     @BlockCoordinates
@@ -200,8 +244,7 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
         }
 
         if (B.isUpdatable(data)) {
-            getParallax().updateBlock(x, y, z);
-            getParallax().getMetaRW(x >> 4, z >> 4).setUpdates(true);
+            getMantle().updateBlock(x, y, z);
         }
     }
 
@@ -210,28 +253,52 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
 
     }
 
+    void blockUpdatedMetric();
+
     @ChunkCoordinates
     @Override
     default void updateChunk(Chunk c) {
-        PrecisionStopwatch p = PrecisionStopwatch.start();
-        if (getParallax().getMetaR(c.getX(), c.getZ()).isUpdates()) {
-            Hunk<Boolean> b = getParallax().getUpdatesR(c.getX(), c.getZ());
-
-            b.iterateSync((x, y, z, v) -> {
-
-                if (v != null && v) {
-                    int vx = x & 15;
-                    int vz = z & 15;
-                    update(x, y, z, c, new RNG(Cache.key(c.getX(), c.getZ())));
-
-                    if (vx > 0 && vx < 15 && vz > 0 && vz < 15) {
-                        updateLighting(x, y, z, c);
+        if (c.getWorld().isChunkLoaded(c.getX() + 1, c.getZ() + 1)
+                && c.getWorld().isChunkLoaded(c.getX(), c.getZ() + 1)
+                && c.getWorld().isChunkLoaded(c.getX() + 1, c.getZ())
+                && c.getWorld().isChunkLoaded(c.getX() - 1, c.getZ() - 1)
+                && c.getWorld().isChunkLoaded(c.getX(), c.getZ() - 1)
+                && c.getWorld().isChunkLoaded(c.getX() - 1, c.getZ())
+                && c.getWorld().isChunkLoaded(c.getX() + 1, c.getZ() - 1)
+                && c.getWorld().isChunkLoaded(c.getX() - 1, c.getZ() + 1)) {
+            getMantle().getMantle().raiseFlag(c.getX(), c.getZ(), MantleFlag.UPDATE, () -> J.s(() -> {
+                PrecisionStopwatch p = PrecisionStopwatch.start();
+                KMap<Long, Integer> updates = new KMap<>();
+                RNG r = new RNG(Cache.key(c.getX(), c.getZ()));
+                getMantle().getMantle().iterateChunk(c.getX(), c.getZ(), MatterCavern.class, (x, y, z, v) -> {
+                    if (B.isAir(c.getBlock(x & 15, y, z & 15).getBlockData())) {
+                        return;
                     }
-                }
-            });
-        }
 
-        getMetrics().getUpdates().put(p.getMilliseconds());
+                    updates.compute(Cache.key(x & 15, z & 15), (k, vv) -> {
+                        if (vv != null) {
+                            return Math.max(vv, y);
+                        }
+
+                        return y;
+                    });
+                });
+
+                updates.forEach((k, v) -> update(Cache.keyX(k), v, Cache.keyZ(k), c, r));
+                getMantle().getMantle().iterateChunk(c.getX(), c.getZ(), MatterUpdate.class, (x, y, z, v) -> {
+                    if (v != null && v.isUpdate()) {
+                        int vx = x & 15;
+                        int vz = z & 15;
+                        update(x, y, z, c, new RNG(Cache.key(c.getX(), c.getZ())));
+                        if (vx > 0 && vx < 15 && vz > 0 && vz < 15) {
+                            updateLighting(x, y, z, c);
+                        }
+                    }
+                });
+
+                getMetrics().getUpdates().put(p.getMilliseconds());
+            }, RNG.r.i(0, 20)));
+        }
     }
 
     @BlockCoordinates
@@ -245,7 +312,6 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
                 block.setBlockData(data, true);
             } catch (Exception e) {
                 Iris.reportError(e);
-                // Issue when adding block data. Suppress massive warnings and stack-traces to console.
             }
         }
     }
@@ -255,7 +321,7 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
     default void update(int x, int y, int z, Chunk c, RNG rf) {
         Block block = c.getBlock(x, y, z);
         BlockData data = block.getBlockData();
-
+        blockUpdatedMetric();
         if (B.isStorage(data)) {
             RNG rx = rf.nextParallelRNG(BlockPosition.toLong(x, y, z));
             InventorySlotType slot = null;
@@ -274,6 +340,9 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
                     Iris.reportError(e);
                 }
             }
+        } else {
+            block.setType(Material.AIR, false);
+            block.setBlockData(data, true);
         }
     }
 
@@ -323,7 +392,7 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
             list.clear();
         }
 
-        list.addAll(r.getLootTables(getFramework().getComplex()));
+        list.addAll(r.getLootTables(getComplex()));
     }
 
     @BlockCoordinates
@@ -331,8 +400,8 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
     default KList<IrisLootTable> getLootTables(RNG rng, Block b) {
         int rx = b.getX();
         int rz = b.getZ();
-        double he = getFramework().getComplex().getHeightStream().get(rx, rz);
-        PlacedObject po = getFramework().getEngine().getObjectPlacement(rx, b.getY(), rz);
+        double he = getComplex().getHeightStream().get(rx, rz);
+        PlacedObject po = getObjectPlacement(rx, b.getY(), rz);
         if (po != null && po.getPlacement() != null) {
 
             if (B.isStorageChest(b.getBlockData())) {
@@ -342,9 +411,9 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
                 }
             }
         }
-        IrisRegion region = getFramework().getComplex().getRegionStream().get(rx, rz);
-        IrisBiome biomeSurface = getFramework().getComplex().getTrueBiomeStream().get(rx, rz);
-        IrisBiome biomeUnder = b.getY() < he ? getFramework().getComplex().getCaveBiomeStream().get(rx, rz) : biomeSurface;
+        IrisRegion region = getComplex().getRegionStream().get(rx, rz);
+        IrisBiome biomeSurface = getComplex().getTrueBiomeStream().get(rx, rz);
+        IrisBiome biomeUnder = b.getY() < he ? getComplex().getCaveBiomeStream().get(rx, rz) : biomeSurface;
         KList<IrisLootTable> tables = new KList<>();
         double multiplier = 1D * getDimension().getLoot().getMultiplier() * region.getLoot().getMultiplier() * biomeSurface.getLoot().getMultiplier() * biomeUnder.getLoot().getMultiplier();
         injectTables(tables, getDimension().getLoot());
@@ -377,31 +446,39 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
             items.addAll(i.getLoot(debug, items.isEmpty(), rng, slot, x, y, z, b + b, mgf + b));
         }
 
-        for (ItemStack i : items) {
-            inv.addItem(i);
+        if (PaperLib.isPaper() && getWorld().hasRealWorld()) {
+            PaperLib.getChunkAtAsync(getWorld().realWorld(), x >> 4, z >> 4).thenAccept((c) -> {
+                Runnable r = () -> {
+                    for (ItemStack i : items) {
+                        inv.addItem(i);
+                    }
+
+                    scramble(inv, rng);
+                };
+
+                if (Bukkit.isPrimaryThread()) {
+                    r.run();
+                } else {
+                    J.s(r);
+                }
+            });
+        } else {
+            for (ItemStack i : items) {
+                inv.addItem(i);
+            }
+
+            scramble(inv, rng);
         }
-
-        scramble(inv, rng);
-    }
-
-    default int getMaxHeight() {
-        return getHeight() + getMinHeight();
     }
 
     EngineEffects getEffects();
-
-    EngineCompound getCompound();
-
-    default boolean isStudio() {
-        return getCompound().isStudio();
-    }
 
     default MultiBurst burst() {
         return getTarget().getBurster();
     }
 
     default void clean() {
-        burst().lazy(() -> getParallax().cleanup());
+        burst().lazy(() -> getMantle().trim());
     }
 
     @BlockCoordinates
@@ -414,11 +491,6 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
         return getRegion(l.getBlockX(), l.getBlockZ());
     }
 
-    @BlockCoordinates
-    default boolean contains(Location l) {
-        return l.getBlockY() >= getMinHeight() && l.getBlockY() <= getMaxHeight();
-    }
-
     IrisBiome getFocus();
 
     IrisEngineData getEngineData();
@@ -429,5 +501,248 @@ public interface Engine extends DataProvider, Fallible, GeneratorAccess, LootPro
 
     default IrisRegion getRegion(Chunk c) {
         return getRegion((c.getX() << 4) + 8, (c.getZ() << 4) + 8);
+    }
+
+    default KList<IrisBiome> getAllBiomes() {
+        KMap<String, IrisBiome> v = new KMap<>();
+
+        IrisDimension dim = getDimension();
+        dim.getAllBiomes(this).forEach((i) -> v.put(i.getLoadKey(), i));
+
+        return v.v();
+    }
+
+    int getGenerated();
+
+    default <T> IrisPosition lookForStreamResult(T find, ProceduralStream<T> stream, Function2<T, T, Boolean> matcher, long timeout) {
+        AtomicInteger checked = new AtomicInteger();
+        AtomicLong time = new AtomicLong(M.ms());
+        AtomicReference<IrisPosition> r = new AtomicReference<>();
+        BurstExecutor b = burst().burst();
+
+        while (M.ms() - time.get() < timeout && r.get() == null) {
+            b.queue(() -> {
+                for (int i = 0; i < 1000; i++) {
+                    if (M.ms() - time.get() > timeout) {
+                        return;
+                    }
+
+                    int x = RNG.r.i(-29999970, 29999970);
+                    int z = RNG.r.i(-29999970, 29999970);
+                    checked.incrementAndGet();
+                    if (matcher.apply(stream.get(x, z), find)) {
+                        r.set(new IrisPosition(x, 120, z));
+                        time.set(0);
+                    }
+                }
+            });
+        }
+
+        return r.get();
+    }
+
+    default IrisPosition lookForBiome(IrisBiome biome, long timeout, Consumer<Integer> triesc) {
+        if (!getWorld().hasRealWorld()) {
+            Iris.error("Cannot GOTO without a bound world (headless mode)");
+            return null;
+        }
+
+        ChronoLatch cl = new ChronoLatch(250, false);
+        long s = M.ms();
+        int cpus = (Runtime.getRuntime().availableProcessors());
+
+        if (!getDimension().getAllBiomes(this).contains(biome)) {
+            return null;
+        }
+
+        AtomicInteger tries = new AtomicInteger(0);
+        AtomicBoolean found = new AtomicBoolean(false);
+        AtomicBoolean running = new AtomicBoolean(true);
+        AtomicReference<IrisPosition> location = new AtomicReference<>();
+        for (int i = 0; i < cpus; i++) {
+            J.a(() -> {
+                try {
+                    Engine e;
+                    IrisBiome b;
+                    int x, z;
+
+                    while (!found.get() && running.get()) {
+                        try {
+                            x = RNG.r.i(-29999970, 29999970);
+                            z = RNG.r.i(-29999970, 29999970);
+                            b = getSurfaceBiome(x, z);
+
+                            if (b != null && b.getLoadKey() == null) {
+                                continue;
+                            }
+
+                            if (b != null && b.getLoadKey().equals(biome.getLoadKey())) {
+                                found.lazySet(true);
+                                location.lazySet(new IrisPosition(x, getHeight(x, z), z));
+                            }
+
+                            tries.getAndIncrement();
+                        } catch (Throwable ex) {
+                            Iris.reportError(ex);
+                            ex.printStackTrace();
+                            return;
+                        }
+                    }
+                } catch (Throwable e) {
+                    Iris.reportError(e);
+                    e.printStackTrace();
+                }
+            });
+        }
+
+        while (!found.get() || location.get() == null) {
+            J.sleep(50);
+
+            if (cl.flip()) {
+                triesc.accept(tries.get());
+            }
+
+            if (M.ms() - s > timeout) {
+                running.set(false);
+                return null;
+            }
+        }
+
+        running.set(false);
+        return location.get();
+    }
+
+    default IrisPosition lookForRegion(IrisRegion reg, long timeout, Consumer<Integer> triesc) {
+        if (getWorld().hasRealWorld()) {
+            Iris.error("Cannot GOTO without a bound world (headless mode)");
+            return null;
+        }
+
+        ChronoLatch cl = new ChronoLatch(3000, false);
+        long s = M.ms();
+        int cpus = (Runtime.getRuntime().availableProcessors());
+
+        if (!getDimension().getRegions().contains(reg.getLoadKey())) {
+            return null;
+        }
+
+        AtomicInteger tries = new AtomicInteger(0);
+        AtomicBoolean found = new AtomicBoolean(false);
+        AtomicBoolean running = new AtomicBoolean(true);
+        AtomicReference<IrisPosition> location = new AtomicReference<>();
+
+        for (int i = 0; i < cpus; i++) {
+            J.a(() -> {
+                Engine e;
+                IrisRegion b;
+                int x, z;
+
+                while (!found.get() && running.get()) {
+                    try {
+                        x = RNG.r.i(-29999970, 29999970);
+                        z = RNG.r.i(-29999970, 29999970);
+                        b = getRegion(x, z);
+
+                        if (b != null && b.getLoadKey() != null && b.getLoadKey().equals(reg.getLoadKey())) {
+                            found.lazySet(true);
+                            location.lazySet(new IrisPosition(x, getHeight(x, z), z));
+                        }
+
+                        tries.getAndIncrement();
+                    } catch (Throwable xe) {
+                        Iris.reportError(xe);
+                        xe.printStackTrace();
+                        return;
+                    }
+                }
+            });
+        }
+
+        while (!found.get() || location.get() != null) {
+            J.sleep(50);
+
+            if (cl.flip()) {
+                triesc.accept(tries.get());
+            }
+
+            if (M.ms() - s > timeout) {
+                triesc.accept(tries.get());
+                running.set(false);
+                return null;
+            }
+        }
+
+        triesc.accept(tries.get());
+        running.set(false);
+        return location.get();
+    }
+
+    double getGeneratedPerSecond();
+
+    default int getHeight() {
+        return getWorld().getHeight();
+    }
+
+    boolean isStudio();
+
+    default IrisBiome getBiome(int x, int y, int z) {
+        if (y <= getHeight(x, z) - 2) {
+            return getCaveBiome(x, z);
+        }
+
+        return getSurfaceBiome(x, z);
+    }
+
+    default IrisBiome getBiomeOrMantle(int x, int y, int z) {
+        if (y <= getHeight(x, z) - 2) {
+            return getCaveOrMantleBiome(x, y, z);
+        }
+
+        return getSurfaceBiome(x, z);
+    }
+
+    default String getObjectPlacementKey(int x, int y, int z) {
+        PlacedObject o = getObjectPlacement(x, y, z);
+
+        if (o != null && o.getObject() != null) {
+            return o.getObject().getLoadKey() + "@" + o.getId();
+        }
+
+        return null;
+    }
+
+    default PlacedObject getObjectPlacement(int x, int y, int z) {
+        String objectAt = getMantle().getMantle().get(x, y, z, String.class);
+
+        if (objectAt == null || objectAt.isEmpty()) {
+            return null;
+        }
+
+        String[] v = objectAt.split("\\Q@\\E");
+        String object = v[0];
+        int id = Integer.parseInt(v[1]);
+        IrisRegion region = getRegion(x, z);
+
+        for (IrisObjectPlacement i : region.getObjects()) {
+            if (i.getPlace().contains(object)) {
+                return new PlacedObject(i, getData().getObjectLoader().load(object), id, x, z);
+            }
+        }
+
+        IrisBiome biome = getBiome(x, y, z);
+
+        for (IrisObjectPlacement i : biome.getObjects()) {
+            if (i.getPlace().contains(object)) {
+                return new PlacedObject(i, getData().getObjectLoader().load(object), id, x, z);
+            }
+        }
+
+        return new PlacedObject(null, getData().getObjectLoader().load(object), id, x, z);
+    }
+
+    int getCacheID();
+
+    default IrisBiome getBiomeOrMantle(Location l) {
+        return getBiomeOrMantle(l.getBlockX(), l.getBlockY(), l.getBlockZ());
     }
 }

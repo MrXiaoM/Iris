@@ -23,6 +23,7 @@ import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.function.NastyFunction;
 import com.volmit.iris.util.function.NastyFuture;
 import com.volmit.iris.util.function.NastyRunnable;
+import com.volmit.iris.util.function.NastySupplier;
 import com.volmit.iris.util.math.FinalInteger;
 import com.volmit.iris.util.parallel.MultiBurst;
 import org.bukkit.Bukkit;
@@ -37,6 +38,9 @@ import java.util.function.Supplier;
 @SuppressWarnings("ALL")
 public class J {
     private static int tid = 0;
+    private static KList<Runnable> afterStartup = new KList<>();
+    private static KList<Runnable> afterStartupAsync = new KList<>();
+    private static boolean started = false;
 
     public static void dofor(int a, Function<Integer, Boolean> c, int ch, Consumer<Integer> d) {
         for (int i = a; c.apply(i); i += ch) {
@@ -65,7 +69,7 @@ public class J {
                 a.run();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                System.out.println("Failed to run async task");
+                Iris.error("Failed to run async task");
                 e.printStackTrace();
             }
         });
@@ -77,10 +81,14 @@ public class J {
                 a.run();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                System.out.println("Failed to run async task");
+                Iris.error("Failed to run async task");
                 e.printStackTrace();
             }
         });
+    }
+
+    public static void aBukkit(Runnable a) {
+        Bukkit.getScheduler().scheduleAsyncDelayedTask(Iris.instance, a);
     }
 
     public static <T> Future<T> a(Callable<T> a) {
@@ -121,11 +129,18 @@ public class J {
         return attemptCatch(r) == null;
     }
 
+    public static <T> T attemptResult(NastySupplier<T> r) {
+        try {
+            return r.get();
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
     public static Throwable attemptCatch(NastyRunnable r) {
         try {
             r.run();
         } catch (Throwable e) {
-            Iris.reportError(e);
             return e;
         }
 
@@ -140,10 +155,6 @@ public class J {
             return i;
         }
     }
-
-    private static KList<Runnable> afterStartup = new KList<>();
-    private static KList<Runnable> afterStartupAsync = new KList<>();
-    private static boolean started = false;
 
     /**
      * Dont call this unless you know what you are doing!
@@ -219,6 +230,15 @@ public class J {
         return f;
     }
 
+    public static CompletableFuture sfut(Runnable r, int delay) {
+        CompletableFuture f = new CompletableFuture();
+        Bukkit.getScheduler().scheduleSyncDelayedTask(Iris.instance, () -> {
+            r.run();
+            f.complete(null);
+        }, delay);
+        return f;
+    }
+
     public static CompletableFuture afut(Runnable r) {
         CompletableFuture f = new CompletableFuture();
         J.a(() -> {
@@ -235,7 +255,11 @@ public class J {
      * @param delay the delay to wait in ticks before running
      */
     public static void s(Runnable r, int delay) {
-        Bukkit.getScheduler().scheduleSyncDelayedTask(Iris.instance, r, delay);
+        try {
+            Bukkit.getScheduler().scheduleSyncDelayedTask(Iris.instance, r, delay);
+        } catch (Throwable e) {
+            Iris.reportError(e);
+        }
     }
 
     /**

@@ -20,7 +20,7 @@ package com.volmit.iris.core.gui;
 
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.events.IrisEngineHotloadEvent;
-import com.volmit.iris.engine.object.noise.NoiseStyle;
+import com.volmit.iris.engine.object.NoiseStyle;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.function.Function2;
 import com.volmit.iris.util.math.M;
@@ -35,9 +35,24 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLayeredPane;
+import javax.swing.JPanel;
+import javax.swing.JViewport;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -50,32 +65,32 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
 
     static JComboBox<String> combo;
     @SuppressWarnings("CanBeFinal")
+    static boolean hd = false;
+    static double ascale = 10;
+    static double oxp = 0;
+    static double ozp = 0;
+    static double mxx = 0;
+    static double mzz = 0;
+    @SuppressWarnings("CanBeFinal")
+    static boolean down = false;
+    @SuppressWarnings("CanBeFinal")
     RollingSequence r = new RollingSequence(20);
     @SuppressWarnings("CanBeFinal")
     boolean colorMode = true;
     double scale = 1;
-    @SuppressWarnings("CanBeFinal")
-    static boolean hd = false;
-    static double ascale = 10;
     CNG cng = NoiseStyle.STATIC.create(new RNG(RNG.r.nextLong()));
     @SuppressWarnings("CanBeFinal")
-    MultiBurst gx = new MultiBurst("Iris Noise Renderer", Thread.MAX_PRIORITY, Runtime.getRuntime().availableProcessors());
+    MultiBurst gx = MultiBurst.burst;
     ReentrantLock l = new ReentrantLock();
     BufferedImage img;
     int w = 0;
     int h = 0;
     Function2<Double, Double, Double> generator;
     Supplier<Function2<Double, Double, Double>> loader;
-    static double oxp = 0;
-    static double ozp = 0;
     double ox = 0; //Offset X
     double oz = 0; //Offset Y
     double mx = 0;
     double mz = 0;
-    static double mxx = 0;
-    static double mzz = 0;
-    @SuppressWarnings("CanBeFinal")
-    static boolean down = false;
     double lx = Double.MAX_VALUE; //MouseX
     double lz = Double.MAX_VALUE; //MouseY
     double t;
@@ -106,9 +121,81 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
         });
     }
 
+    private static void createAndShowGUI(Supplier<Function2<Double, Double, Double>> loader, String genName) {
+        JFrame frame = new JFrame("Noise Explorer: " + genName);
+        NoiseExplorerGUI nv = new NoiseExplorerGUI();
+        frame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        JLayeredPane pane = new JLayeredPane();
+        nv.setSize(new Dimension(1440, 820));
+        pane.add(nv, 1, 0);
+        nv.loader = loader;
+        nv.generator = loader.get();
+        frame.add(pane);
+        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
+
+        if (file != null) {
+            try {
+                frame.setIconImage(ImageIO.read(file));
+            } catch (IOException e) {
+                Iris.reportError(e);
+            }
+        }
+        frame.setSize(1440, 820);
+        frame.setVisible(true);
+    }
+
+    private static void createAndShowGUI() {
+        JFrame frame = new JFrame("Noise Explorer");
+        NoiseExplorerGUI nv = new NoiseExplorerGUI();
+        frame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        KList<String> li = new KList<>(NoiseStyle.values()).toStringList();
+        combo = new JComboBox<>(li.toArray(new String[0]));
+        combo.setSelectedItem("STATIC");
+        combo.setFocusable(false);
+        combo.addActionListener(e -> {
+            @SuppressWarnings("unchecked")
+            String b = (String) (((JComboBox<String>) e.getSource()).getSelectedItem());
+            NoiseStyle s = NoiseStyle.valueOf(b);
+            nv.cng = s.create(RNG.r.nextParallelRNG(RNG.r.imax()));
+        });
+
+        combo.setSize(500, 30);
+        JLayeredPane pane = new JLayeredPane();
+        nv.setSize(new Dimension(1440, 820));
+        pane.add(nv, 1, 0);
+        pane.add(combo, 2, 0);
+        frame.add(pane);
+        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
+
+        if (file != null) {
+            try {
+                frame.setIconImage(ImageIO.read(file));
+            } catch (IOException e) {
+                Iris.reportError(e);
+            }
+        }
+        frame.setSize(1440, 820);
+        frame.setVisible(true);
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                Iris.instance.unregisterListener(nv);
+            }
+        });
+    }
+
+    public static void launch(Supplier<Function2<Double, Double, Double>> gen, String genName) {
+        EventQueue.invokeLater(() -> createAndShowGUI(gen, genName));
+    }
+
+    public static void launch() {
+        EventQueue.invokeLater(NoiseExplorerGUI::createAndShowGUI);
+    }
+
     @EventHandler
     public void on(IrisEngineHotloadEvent e) {
-        generator = loader.get();
+        if (generator != null)
+            generator = loader.get();
     }
 
     public void mouseWheelMoved(MouseWheelEvent e) {
@@ -212,7 +299,7 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
                 });
             }
 
-            e.complete(1000);
+            e.complete();
             gg.drawImage(img, 0, 0, getParent().getWidth() * accuracy, getParent().getHeight() * accuracy, (img, infoflags, x, y, width, height) -> true);
         }
 
@@ -238,78 +325,6 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
             J.sleep((long) Math.max(0, 32 - r.getAverage()));
             repaint();
         });
-    }
-
-    private static void createAndShowGUI(Supplier<Function2<Double, Double, Double>> loader, String genName) {
-        JFrame frame = new JFrame("Noise Explorer: " + genName);
-        NoiseExplorerGUI nv = new NoiseExplorerGUI();
-        frame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-        JLayeredPane pane = new JLayeredPane();
-        nv.setSize(new Dimension(1440, 820));
-        pane.add(nv, 1, 0);
-        nv.loader = loader;
-        nv.generator = loader.get();
-        frame.add(pane);
-        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
-
-        if (file != null) {
-            try {
-                frame.setIconImage(ImageIO.read(file));
-            } catch (IOException e) {
-                Iris.reportError(e);
-            }
-        }
-        frame.setSize(1440, 820);
-        frame.setVisible(true);
-    }
-
-    private static void createAndShowGUI() {
-        JFrame frame = new JFrame("Noise Explorer");
-        NoiseExplorerGUI nv = new NoiseExplorerGUI();
-        frame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-        KList<String> li = new KList<>(NoiseStyle.values()).toStringList();
-        combo = new JComboBox<>(li.toArray(new String[0]));
-        combo.setSelectedItem("STATIC");
-        combo.setFocusable(false);
-        combo.addActionListener(e -> {
-            @SuppressWarnings("unchecked")
-            String b = (String) (((JComboBox<String>) e.getSource()).getSelectedItem());
-            NoiseStyle s = NoiseStyle.valueOf(b);
-            nv.cng = s.create(RNG.r.nextParallelRNG(RNG.r.imax()));
-        });
-
-        combo.setSize(500, 30);
-        JLayeredPane pane = new JLayeredPane();
-        nv.setSize(new Dimension(1440, 820));
-        pane.add(nv, 1, 0);
-        pane.add(combo, 2, 0);
-        frame.add(pane);
-        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
-
-        if (file != null) {
-            try {
-                frame.setIconImage(ImageIO.read(file));
-            } catch (IOException e) {
-                Iris.reportError(e);
-            }
-        }
-        frame.setSize(1440, 820);
-        frame.setVisible(true);
-        frame.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
-                nv.gx.shutdownLater();
-                Iris.instance.unregisterListener(nv);
-            }
-        });
-    }
-
-    public static void launch(Supplier<Function2<Double, Double, Double>> gen, String genName) {
-        EventQueue.invokeLater(() -> createAndShowGUI(gen, genName));
-    }
-
-    public static void launch() {
-        EventQueue.invokeLater(NoiseExplorerGUI::createAndShowGUI);
     }
 
     static class HandScrollListener extends MouseAdapter {

@@ -21,13 +21,12 @@ package com.volmit.iris.core.gui;
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.gui.components.IrisRenderer;
 import com.volmit.iris.core.gui.components.RenderType;
-import com.volmit.iris.core.tools.IrisWorlds;
+import com.volmit.iris.core.tools.IrisToolbelt;
 import com.volmit.iris.engine.IrisComplex;
 import com.volmit.iris.engine.framework.Engine;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.object.biome.IrisBiome;
-import com.volmit.iris.engine.object.common.IrisWorld;
-import com.volmit.iris.engine.object.regional.IrisRegion;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisRegion;
+import com.volmit.iris.engine.object.IrisWorld;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.collection.KSet;
@@ -45,10 +44,20 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
 import javax.swing.event.MouseInputListener;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -59,7 +68,17 @@ import java.util.function.BiFunction;
 
 public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener, MouseMotionListener, MouseInputListener {
     private static final long serialVersionUID = 2094606939770332040L;
-
+    private final KList<LivingEntity> lastEntities = new KList<>();
+    private final KMap<String, Long> notifications = new KMap<>();
+    private final ChronoLatch centities = new ChronoLatch(1000);
+    private final RollingSequence rs = new RollingSequence(512);
+    private final O<Integer> m = new O<>();
+    private final KMap<BlockPosition, BufferedImage> positions = new KMap<>();
+    private final KMap<BlockPosition, BufferedImage> fastpositions = new KMap<>();
+    private final KSet<BlockPosition> working = new KSet<>();
+    private final KSet<BlockPosition> workingfast = new KSet<>();
+    double tfps = 240D;
+    int ltc = 3;
     private RenderType currentType = RenderType.BIOME;
     private boolean help = true;
     private boolean helpIgnored = false;
@@ -83,7 +102,6 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
     private int h = 0;
     private double lx = 0;
     private double lz = 0;
-    private final KList<LivingEntity> lastEntities = new KList<>();
     private double ox = 0;
     private double oz = 0;
     private double hx = 0;
@@ -91,17 +109,7 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
     private double oxp = 0;
     private double ozp = 0;
     private Engine engine;
-    private final KMap<String, Long> notifications = new KMap<>();
-    double tfps = 240D;
-    int ltc = 3;
-    private final ChronoLatch centities = new ChronoLatch(1000);
-    private final RollingSequence rs = new RollingSequence(512);
-    private final O<Integer> m = new O<>();
     private int tid = 0;
-    private final KMap<BlockPosition, BufferedImage> positions = new KMap<>();
-    private final KMap<BlockPosition, BufferedImage> fastpositions = new KMap<>();
-    private final KSet<BlockPosition> working = new KSet<>();
-    private final KSet<BlockPosition> workingfast = new KSet<>();
     private final ExecutorService e = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), r -> {
         tid++;
         Thread t = new Thread(r);
@@ -154,13 +162,39 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         });
     }
 
+    private static void createAndShowGUI(Engine r, int s, IrisWorld world) {
+        JFrame frame = new JFrame("Vision");
+        VisionGUI nv = new VisionGUI(frame);
+        nv.world = world;
+        nv.engine = r;
+        nv.renderer = new IrisRenderer(r);
+        frame.add(nv);
+        frame.setSize(1440, 820);
+        frame.setVisible(true);
+        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
+
+        if (file != null) {
+            try {
+                nv.texture = ImageIO.read(file);
+                frame.setIconImage(ImageIO.read(file));
+            } catch (IOException e) {
+                Iris.reportError(e);
+
+            }
+        }
+    }
+
+    public static void launch(Engine g, int i) {
+        J.a(() ->
+                createAndShowGUI(g, i, g.getWorld()));
+    }
+
     public boolean updateEngine() {
         if (engine.isClosed()) {
-            int index = engine.getIndex();
-
             if (world.hasRealWorld()) {
                 try {
-                    engine = IrisWorlds.access(world.realWorld()).getCompound().getEngine(index);
+                    engine = IrisToolbelt.access(world.realWorld()).getEngine();
+                    Iris.info("Updated Renderer");
                     return !engine.isClosed();
                 } catch (Throwable e) {
 
@@ -191,26 +225,23 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         BiFunction<Double, Double, Integer> colorFunction = (d, dx) -> Color.black.getRGB();
 
         switch (currentType) {
-            case BIOME:
-            case DECORATOR_LOAD:
-            case OBJECT_LOAD:
-            case LAYER_LOAD:
-                colorFunction = (x, z) -> engine.getFramework().getComplex().getTrueBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+            case BIOME: case DECORATOR_LOAD: case OBJECT_LOAD: case LAYER_LOAD:
+                colorFunction = (x, z) -> engine.getComplex().getTrueBiomeStreamNoFeatures().get(x, z).getColor(engine, currentType).getRGB();
                 break;
             case BIOME_LAND:
-                colorFunction = (x, z) -> engine.getFramework().getComplex().getLandBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                colorFunction = (x, z) -> engine.getComplex().getLandBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
                 break;
             case BIOME_SEA:
-                colorFunction = (x, z) -> engine.getFramework().getComplex().getSeaBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                colorFunction = (x, z) -> engine.getComplex().getSeaBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
                 break;
             case REGION:
-                colorFunction = (x, z) -> engine.getFramework().getComplex().getRegionStream().get(x, z).getColor(engine.getFramework().getComplex(), currentType).getRGB();
+                colorFunction = (x, z) -> engine.getComplex().getRegionStream().get(x, z).getColor(engine.getComplex(), currentType).getRGB();
                 break;
             case CAVE_LAND:
-                colorFunction = (x, z) -> engine.getFramework().getComplex().getCaveBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                colorFunction = (x, z) -> engine.getComplex().getCaveBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
                 break;
             case HEIGHT:
-                colorFunction = (x, z) -> Color.getHSBColor(engine.getFramework().getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
+                colorFunction = (x, z) -> Color.getHSBColor(engine.getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
                 break;
         }
 
@@ -644,8 +675,8 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
     }
 
     private void renderHoverOverlay(Graphics2D g, boolean detailed) {
-        IrisBiome biome = engine.getFramework().getComplex().getTrueBiomeStream().get(getWorldX(hx), getWorldZ(hz));
-        IrisRegion region = engine.getFramework().getComplex().getRegionStream().get(getWorldX(hx), getWorldZ(hz));
+        IrisBiome biome = engine.getComplex().getTrueBiomeStream().get(getWorldX(hx), getWorldZ(hz));
+        IrisRegion region = engine.getComplex().getRegionStream().get(getWorldX(hx), getWorldZ(hz));
         KList<String> l = new KList<>();
         l.add("Biome: " + biome.getName());
         l.add("Region: " + region.getName() + "(" + region.getLoadKey() + ")");
@@ -707,15 +738,11 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
     }
 
     private void open() {
-        IrisComplex complex = engine.getFramework().getComplex();
+        IrisComplex complex = engine.getComplex();
         File r = null;
         switch (currentType) {
-            case BIOME:
-            case LAYER_LOAD:
-            case DECORATOR_LOAD:
-            case OBJECT_LOAD:
-            case HEIGHT:
-                r = complex.getTrueBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+            case BIOME: case LAYER_LOAD: case DECORATOR_LOAD: case OBJECT_LOAD, HEIGHT:
+                r = complex.getTrueBiomeStreamNoFeatures().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
                 break;
             case BIOME_LAND:
                 r = complex.getLandBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
@@ -739,7 +766,7 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
             if (player != null) {
                 int xx = (int) getWorldX(hx);
                 int zz = (int) getWorldZ(hz);
-                double h = engine.getFramework().getComplex().getTrueHeightStream().get(xx, zz);
+                double h = engine.getComplex().getTrueHeightStream().get(xx, zz);
                 player.teleport(new Location(player.getWorld(), xx, h, zz));
                 notify("Teleporting to " + xx + ", " + (int) h + ", " + zz);
             } else {
@@ -784,33 +811,6 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         for (String i : text) {
             g.drawString(i, x + 14 - cw, y + 14 - ch + (++m * g.getFontMetrics().getHeight()));
         }
-    }
-
-    private static void createAndShowGUI(Engine r, int s, IrisWorld world) {
-        JFrame frame = new JFrame("Vision");
-        VisionGUI nv = new VisionGUI(frame);
-        nv.world = world;
-        nv.engine = r;
-        nv.renderer = new IrisRenderer(r);
-        frame.add(nv);
-        frame.setSize(1440, 820);
-        frame.setVisible(true);
-        File file = Iris.getCached("Iris Icon", "https://raw.githubusercontent.com/VolmitSoftware/Iris/master/icon.png");
-
-        if (file != null) {
-            try {
-                nv.texture = ImageIO.read(file);
-                frame.setIconImage(ImageIO.read(file));
-            } catch (IOException e) {
-                Iris.reportError(e);
-
-            }
-        }
-    }
-
-    public static void launch(IrisAccess g, int i) {
-        J.a(() ->
-                createAndShowGUI(g.getCompound().getEngine(i), i, g.getCompound().getWorld()));
     }
 
     public void mouseWheelMoved(MouseWheelEvent e) {

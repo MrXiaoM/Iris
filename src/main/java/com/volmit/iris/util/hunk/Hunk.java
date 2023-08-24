@@ -18,20 +18,43 @@
 
 package com.volmit.iris.util.hunk;
 
-import com.volmit.iris.Iris;
-import com.volmit.iris.engine.object.basic.IrisPosition;
+import com.volmit.iris.engine.object.IrisPosition;
 import com.volmit.iris.util.collection.KList;
-import com.volmit.iris.util.function.*;
-import com.volmit.iris.util.hunk.io.HunkIOAdapter;
-import com.volmit.iris.util.hunk.storage.*;
-import com.volmit.iris.util.hunk.view.*;
+import com.volmit.iris.util.function.Consumer2;
+import com.volmit.iris.util.function.Consumer3;
+import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4IO;
+import com.volmit.iris.util.function.Consumer5;
+import com.volmit.iris.util.function.Consumer6;
+import com.volmit.iris.util.function.Consumer8;
+import com.volmit.iris.util.function.Function3;
+import com.volmit.iris.util.function.NoiseProvider;
+import com.volmit.iris.util.function.NoiseProvider3;
+import com.volmit.iris.util.function.Supplier3R;
+import com.volmit.iris.util.hunk.storage.ArrayHunk;
+import com.volmit.iris.util.hunk.storage.AtomicDoubleHunk;
+import com.volmit.iris.util.hunk.storage.AtomicHunk;
+import com.volmit.iris.util.hunk.storage.AtomicIntegerHunk;
+import com.volmit.iris.util.hunk.storage.AtomicLongHunk;
+import com.volmit.iris.util.hunk.storage.MappedHunk;
+import com.volmit.iris.util.hunk.storage.SynchronizedArrayHunk;
+import com.volmit.iris.util.hunk.view.BiomeGridHunkView;
+import com.volmit.iris.util.hunk.view.ChunkBiomeHunkView;
+import com.volmit.iris.util.hunk.view.ChunkDataHunkView;
+import com.volmit.iris.util.hunk.view.ChunkHunkView;
+import com.volmit.iris.util.hunk.view.DriftHunkView;
+import com.volmit.iris.util.hunk.view.FringedHunkView;
+import com.volmit.iris.util.hunk.view.FunctionalHunkView;
+import com.volmit.iris.util.hunk.view.HunkView;
+import com.volmit.iris.util.hunk.view.InvertedHunkView;
+import com.volmit.iris.util.hunk.view.ListeningHunk;
+import com.volmit.iris.util.hunk.view.ReadOnlyHunk;
+import com.volmit.iris.util.hunk.view.SynchronizedHunkView;
+import com.volmit.iris.util.hunk.view.WriteTrackHunk;
 import com.volmit.iris.util.interpolation.InterpolationMethod;
 import com.volmit.iris.util.interpolation.InterpolationMethod3D;
 import com.volmit.iris.util.interpolation.IrisInterpolation;
 import com.volmit.iris.util.math.BlockPosition;
-import com.volmit.iris.util.math.M;
-import com.volmit.iris.util.math.MathHelper;
-import com.volmit.iris.util.oldnbt.ByteArrayTag;
 import com.volmit.iris.util.parallel.BurstExecutor;
 import com.volmit.iris.util.parallel.MultiBurst;
 import com.volmit.iris.util.stream.interpolation.Interpolated;
@@ -40,11 +63,8 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.generator.ChunkGenerator.BiomeGrid;
 import org.bukkit.generator.ChunkGenerator.ChunkData;
-import org.bukkit.util.Vector;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -104,18 +124,6 @@ public interface Hunk<T> {
     @SafeVarargs
     static <T> Hunk<T> newCombinedHunk(Hunk<T>... hunks) {
         return newCombinedArrayHunk(hunks);
-    }
-
-    default Hunk<T> listen(Consumer4<Integer, Integer, Integer, T> l) {
-        return new ListeningHunk<>(this, l);
-    }
-
-    default Hunk<T> synchronize() {
-        return new SynchronizedHunkView<>(this);
-    }
-
-    default Hunk<T> trackWrite(AtomicBoolean b) {
-        return new WriteTrackHunk<T>(this, b);
     }
 
     static <T> Hunk<T> newArrayHunk(int w, int h, int d) {
@@ -214,6 +222,208 @@ public interface Hunk<T> {
         return b;
     }
 
+    static <A, B> void computeDual2D(int parallelism, Hunk<A> a, Hunk<B> b, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> v) {
+        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight() || a.getDepth() != b.getDepth()) {
+            throw new RuntimeException("Hunk sizes must match!");
+        }
+
+        if (a.get2DDimension(parallelism) == 1) {
+            v.accept(0, 0, 0, a, b);
+            return;
+        }
+
+        BurstExecutor e = MultiBurst.burst.burst(parallelism);
+        KList<Runnable> rq = new KList<Runnable>(parallelism);
+        getDualSections2D(parallelism, a, b, (xx, yy, zz, ha, hr, r) -> e.queue(() ->
+        {
+            v.accept(xx, yy, zz, ha, hr);
+
+            synchronized (rq) {
+                rq.add(r);
+            }
+        }), (x, y, z, hax, hbx) ->
+        {
+            a.insert(x, y, z, hax);
+            b.insert(x, y, z, hbx);
+        });
+        e.complete();
+        rq.forEach(Runnable::run);
+        return;
+    }
+
+    static <A, B> void getDualSections2D(int sections, Hunk<A> a, Hunk<B> b, Consumer6<Integer, Integer, Integer, Hunk<A>, Hunk<B>, Runnable> v, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> inserterAB) {
+        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight() || a.getDepth() != b.getDepth()) {
+            throw new RuntimeException("Hunk sizes must match!");
+        }
+
+        int dim = a.get2DDimension(sections);
+
+        if (sections <= 1) {
+            getDualSection(0, 0, 0, a.getWidth(), a.getHeight(), a.getDepth(), a, b, (ha, hr, r) -> v.accept(0, 0, 0, ha, hr, r), inserterAB);
+            return;
+        }
+
+        int w = a.getWidth() / dim;
+        int wr = a.getWidth() - (w * dim);
+        int d = a.getDepth() / dim;
+        int dr = a.getDepth() - (d * dim);
+        int i, j;
+
+        for (i = 0; i < a.getWidth(); i += w) {
+            int ii = i;
+
+            for (j = 0; j < a.getDepth(); j += d) {
+                int jj = j;
+                getDualSection(i, 0, j, i + w + (i == 0 ? wr : 0), a.getHeight(), j + d + (j == 0 ? dr : 0), a, b, (ha, hr, r) -> v.accept(ii, 0, jj, ha, hr, r), inserterAB);
+                i = i == 0 ? i + wr : i;
+                j = j == 0 ? j + dr : j;
+            }
+        }
+    }
+
+    static <A, B> void getDualSection(int x, int y, int z, int x1, int y1, int z1, Hunk<A> a, Hunk<B> b, Consumer3<Hunk<A>, Hunk<B>, Runnable> v, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> inserter) {
+        Hunk<A> copya = a.crop(x, y, z, x1, y1, z1);
+        Hunk<B> copyb = b.crop(x, y, z, x1, y1, z1);
+        v.accept(copya, copyb, () -> inserter.accept(x, y, z, copya, copyb));
+    }
+
+    /**
+     * Create a hunk that is optimized for specific uses
+     *
+     * @param w          width
+     * @param h          height
+     * @param d          depth
+     * @param type       the class type
+     * @param packed     if the hunk is generally more than 50% full (non-null nodes)
+     * @param concurrent if this hunk must be thread safe
+     * @param <T>        the type
+     * @return the hunk
+     */
+    static <T> Hunk<T> newHunk(int w, int h, int d, Class<T> type, boolean packed, boolean concurrent) {
+        if (type.equals(Double.class)) {
+            return concurrent ?
+                    packed ? (Hunk<T>) newAtomicDoubleHunk(w, h, d) : newMappedHunk(w, h, d)
+                    : packed ? newArrayHunk(w, h, d) : newMappedHunkSynced(w, h, d);
+        }
+
+        if (type.equals(Integer.class)) {
+            return concurrent ?
+                    packed ? (Hunk<T>) newAtomicIntegerHunk(w, h, d) : newMappedHunk(w, h, d)
+                    : packed ? newArrayHunk(w, h, d) : newMappedHunkSynced(w, h, d);
+        }
+
+        if (type.equals(Long.class)) {
+            return concurrent ?
+                    packed ? (Hunk<T>) newAtomicLongHunk(w, h, d) : newMappedHunk(w, h, d)
+                    : packed ? newArrayHunk(w, h, d) : newMappedHunkSynced(w, h, d);
+        }
+
+        return concurrent ?
+                packed ? newAtomicHunk(w, h, d) : newMappedHunk(w, h, d)
+                : packed ? newArrayHunk(w, h, d) : newMappedHunkSynced(w, h, d);
+    }
+
+    static IrisPosition rotatedBounding(int w, int h, int d, double x, double y, double z) {
+        int[] iii = {0, 0, 0};
+        int[] aaa = {w, h, d};
+        int[] aai = {w, h, 0};
+        int[] iaa = {0, h, d};
+        int[] aia = {w, 0, d};
+        int[] iai = {0, h, 0};
+        int[] iia = {0, 0, d};
+        int[] aii = {w, 0, 0};
+        rotate(x, y, z, iii);
+        rotate(x, y, z, aaa);
+        rotate(x, y, z, aai);
+        rotate(x, y, z, iaa);
+        rotate(x, y, z, aia);
+        rotate(x, y, z, iai);
+        rotate(x, y, z, iia);
+        rotate(x, y, z, aii);
+        int maxX = max(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
+        int minX = min(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
+        int maxY = max(iii[1], aaa[1], aai[1], iaa[1], aia[1], iai[1], iia[1], aii[1]);
+        int minY = min(iii[1], aaa[1], aai[1], iaa[1], aia[1], iai[1], iia[1], aii[1]);
+        int maxZ = max(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
+        int minZ = min(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
+        return new IrisPosition(maxX - minX, maxY - minY, maxZ - minZ);
+    }
+
+    static int max(int a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8) {
+        return Math.max(Math.max(Math.max(a5, a6), Math.max(a7, a8)), Math.max(Math.max(a1, a2), Math.max(a3, a4)));
+    }
+
+    static int min(int a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8) {
+        return Math.min(Math.min(Math.min(a5, a6), Math.min(a7, a8)), Math.min(Math.min(a1, a2), Math.min(a3, a4)));
+    }
+
+    static void rotate(double x, double y, double z, int[] c) {
+        if (x % 360 != 0) {
+            rotateAroundX(Math.toRadians(x), c);
+        }
+
+        if (y % 360 != 0) {
+            rotateAroundY(Math.toRadians(y), c);
+        }
+
+        if (z % 360 != 0) {
+            rotateAroundZ(Math.toRadians(z), c);
+        }
+    }
+
+    static void rotateAroundX(double a, int[] c) {
+        rotateAroundX(Math.cos(a), Math.sin(a), c);
+    }
+
+    static void rotateAroundX(double cos, double sin, int[] c) {
+        int y = (int) Math.floor(cos * (double) (c[1] + 0.5) - sin * (double) (c[2] + 0.5));
+        int z = (int) Math.floor(sin * (double) (c[1] + 0.5) + cos * (double) (c[2] + 0.5));
+        c[1] = y;
+        c[2] = z;
+    }
+
+    static void rotateAroundY(double a, int[] c) {
+        rotateAroundY(Math.cos(a), Math.sin(a), c);
+    }
+
+    static void rotateAroundY(double cos, double sin, int[] c) {
+        int x = (int) Math.floor(cos * (double) (c[0] + 0.5) + sin * (double) (c[2] + 0.5));
+        int z = (int) Math.floor(-sin * (double) (c[0] + 0.5) + cos * (double) (c[2] + 0.5));
+        c[0] = x;
+        c[2] = z;
+    }
+
+    static void rotateAroundZ(double a, int[] c) {
+        rotateAroundZ(Math.cos(a), Math.sin(a), c);
+    }
+
+    static void rotateAroundZ(double cos, double sin, int[] c) {
+        int x = (int) Math.floor(cos * (double) (c[0] + 0.5) - sin * (double) (c[1] + 0.5));
+        int y = (int) Math.floor(sin * (double) (c[0] + 0.5) + cos * (double) (c[1] + 0.5));
+        c[0] = x;
+        c[1] = y;
+    }
+
+    default boolean isMapped() {
+        return false;
+    }
+
+    default int getEntryCount() {
+        return getWidth() * getHeight() * getDepth();
+    }
+
+    default Hunk<T> listen(Consumer4<Integer, Integer, Integer, T> l) {
+        return new ListeningHunk<>(this, l);
+    }
+
+    default Hunk<T> synchronize() {
+        return new SynchronizedHunkView<>(this);
+    }
+
+    default Hunk<T> trackWrite(AtomicBoolean b) {
+        return new WriteTrackHunk<T>(this, b);
+    }
+
     default Hunk<T> readOnly() {
         return new ReadOnlyHunk<>(this);
     }
@@ -223,18 +433,6 @@ public interface Hunk<T> {
         iterate((x, y, z, v) -> count.getAndAdd(1));
 
         return count.get();
-    }
-
-    default void write(OutputStream s, HunkIOAdapter<T> h) throws IOException {
-        h.write(this, s);
-    }
-
-    default ByteArrayTag writeByteArrayTag(HunkIOAdapter<T> h, String name) throws IOException {
-        return h.writeByteArrayTag(this, name);
-    }
-
-    default void write(File s, HunkIOAdapter<T> h) throws IOException {
-        h.write(this, s);
     }
 
     default boolean isAtomic() {
@@ -599,71 +797,6 @@ public interface Hunk<T> {
 
     default Hunk<T> compute2D(Consumer4<Integer, Integer, Integer, Hunk<T>> v) {
         return compute2D(getIdeal2DParallelism(), v);
-    }
-
-    static <A, B> void computeDual2D(int parallelism, Hunk<A> a, Hunk<B> b, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> v) {
-        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight() || a.getDepth() != b.getDepth()) {
-            throw new RuntimeException("Hunk sizes must match!");
-        }
-
-        if (a.get2DDimension(parallelism) == 1) {
-            v.accept(0, 0, 0, a, b);
-            return;
-        }
-
-        BurstExecutor e = MultiBurst.burst.burst(parallelism);
-        KList<Runnable> rq = new KList<Runnable>(parallelism);
-        getDualSections2D(parallelism, a, b, (xx, yy, zz, ha, hr, r) -> e.queue(() ->
-        {
-            v.accept(xx, yy, zz, ha, hr);
-
-            synchronized (rq) {
-                rq.add(r);
-            }
-        }), (x, y, z, hax, hbx) ->
-        {
-            a.insert(x, y, z, hax);
-            b.insert(x, y, z, hbx);
-        });
-        e.complete();
-        rq.forEach(Runnable::run);
-        return;
-    }
-
-    static <A, B> void getDualSections2D(int sections, Hunk<A> a, Hunk<B> b, Consumer6<Integer, Integer, Integer, Hunk<A>, Hunk<B>, Runnable> v, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> inserterAB) {
-        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight() || a.getDepth() != b.getDepth()) {
-            throw new RuntimeException("Hunk sizes must match!");
-        }
-
-        int dim = a.get2DDimension(sections);
-
-        if (sections <= 1) {
-            getDualSection(0, 0, 0, a.getWidth(), a.getHeight(), a.getDepth(), a, b, (ha, hr, r) -> v.accept(0, 0, 0, ha, hr, r), inserterAB);
-            return;
-        }
-
-        int w = a.getWidth() / dim;
-        int wr = a.getWidth() - (w * dim);
-        int d = a.getDepth() / dim;
-        int dr = a.getDepth() - (d * dim);
-        int i, j;
-
-        for (i = 0; i < a.getWidth(); i += w) {
-            int ii = i;
-
-            for (j = 0; j < a.getDepth(); j += d) {
-                int jj = j;
-                getDualSection(i, 0, j, i + w + (i == 0 ? wr : 0), a.getHeight(), j + d + (j == 0 ? dr : 0), a, b, (ha, hr, r) -> v.accept(ii, 0, jj, ha, hr, r), inserterAB);
-                i = i == 0 ? i + wr : i;
-                j = j == 0 ? j + dr : j;
-            }
-        }
-    }
-
-    static <A, B> void getDualSection(int x, int y, int z, int x1, int y1, int z1, Hunk<A> a, Hunk<B> b, Consumer3<Hunk<A>, Hunk<B>, Runnable> v, Consumer5<Integer, Integer, Integer, Hunk<A>, Hunk<B>> inserter) {
-        Hunk<A> copya = a.crop(x, y, z, x1, y1, z1);
-        Hunk<B> copyb = b.crop(x, y, z, x1, y1, z1);
-        v.accept(copya, copyb, () -> inserter.accept(x, y, z, copya, copyb));
     }
 
     default Hunk<T> compute2D(int parallelism, Consumer4<Integer, Integer, Integer, Hunk<T>> v) {
@@ -1273,57 +1406,29 @@ public interface Hunk<T> {
         return t;
     }
 
-    static IrisPosition rotatedBounding(int w, int h, int d, double x, double y, double z)
-    {
-        int[] iii = {0,0,0};
-        int[] aaa = {w,h,d};
-        int[] aai = {w,h,0};
-        int[] iaa = {0,h,d};
-        int[] aia = {w,0,d};
-        int[] iai = {0,h,0};
-        int[] iia = {0,0,d};
-        int[] aii = {w,0,0};
-        rotate(x,y,z,iii);
-        rotate(x,y,z,aaa);
-        rotate(x,y,z,aai);
-        rotate(x,y,z,iaa);
-        rotate(x,y,z,aia);
-        rotate(x,y,z,iai);
-        rotate(x,y,z,iia);
-        rotate(x,y,z,aii);
-        int maxX = max(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
-        int minX = min(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
-        int maxY = max(iii[1], aaa[1], aai[1], iaa[1], aia[1], iai[1], iia[1], aii[1]);
-        int minY = min(iii[1], aaa[1], aai[1], iaa[1], aia[1], iai[1], iia[1], aii[1]);
-        int maxZ = max(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
-        int minZ = min(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
-        return new IrisPosition(maxX - minX, maxY - minY, maxZ - minZ);
-    }
-
-    default Hunk<T> rotate(double x, double y, double z, Supplier3R<Integer, Integer, Integer, Hunk<T>> builder)
-    {
+    default Hunk<T> rotate(double x, double y, double z, Supplier3R<Integer, Integer, Integer, Hunk<T>> builder) {
         int w = getWidth();
         int h = getHeight();
         int d = getDepth();
-        int i,j,k;
-        int[] c = {w/2,h/2,d/2};
-        int[] b = {0,0,0};
-        int[] iii = {0,0,0};
-        int[] aaa = {w,h,d};
-        int[] aai = {w,h,0};
-        int[] iaa = {0,h,d};
-        int[] aia = {w,0,d};
-        int[] iai = {0,h,0};
-        int[] iia = {0,0,d};
-        int[] aii = {w,0,0};
-        rotate(x,y,z,iii);
-        rotate(x,y,z,aaa);
-        rotate(x,y,z,aai);
-        rotate(x,y,z,iaa);
-        rotate(x,y,z,aia);
-        rotate(x,y,z,iai);
-        rotate(x,y,z,iia);
-        rotate(x,y,z,aii);
+        int i, j, k;
+        int[] c = {w / 2, h / 2, d / 2};
+        int[] b = {0, 0, 0};
+        int[] iii = {0, 0, 0};
+        int[] aaa = {w, h, d};
+        int[] aai = {w, h, 0};
+        int[] iaa = {0, h, d};
+        int[] aia = {w, 0, d};
+        int[] iai = {0, h, 0};
+        int[] iia = {0, 0, d};
+        int[] aii = {w, 0, 0};
+        rotate(x, y, z, iii);
+        rotate(x, y, z, aaa);
+        rotate(x, y, z, aai);
+        rotate(x, y, z, iaa);
+        rotate(x, y, z, aia);
+        rotate(x, y, z, iai);
+        rotate(x, y, z, iia);
+        rotate(x, y, z, aii);
         int maxX = max(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
         int minX = min(iii[0], aaa[0], aai[0], iaa[0], aia[0], iai[0], iia[0], aii[0]);
         int maxY = max(iii[1], aaa[1], aai[1], iaa[1], aia[1], iai[1], iia[1], aii[1]);
@@ -1331,26 +1436,19 @@ public interface Hunk<T> {
         int maxZ = max(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
         int minZ = min(iii[2], aaa[2], aai[2], iaa[2], aia[2], iai[2], iia[2], aii[2]);
         Hunk<T> r = builder.get(maxX - minX, maxY - minY, maxZ - minZ);
-        int[] cr = {(maxX - minX)/2,(maxY - minY)/2,(maxZ - minZ)/2};
+        int[] cr = {(maxX - minX) / 2, (maxY - minY) / 2, (maxZ - minZ) / 2};
 
-        for(i = 0; i < w; i++)
-        {
-            for(j = 0; j < h; j++)
-            {
-                for(k = 0; k < d; k++)
-                {
+        for (i = 0; i < w; i++) {
+            for (j = 0; j < h; j++) {
+                for (k = 0; k < d; k++) {
                     b[0] = i - c[0];
                     b[1] = j - c[1];
                     b[2] = k - c[2];
                     rotate(x, y, z, b);
 
-                    try
-                    {
+                    try {
                         r.set(b[0] + cr[0], b[1] + cr[1], b[2] + cr[2], get(i, j, k));
-                    }
-
-                    catch(Throwable e)
-                    {
+                    } catch (Throwable e) {
 
                     }
                 }
@@ -1360,64 +1458,11 @@ public interface Hunk<T> {
         return r;
     }
 
-    static int max(int a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8)
-    {
-        return Math.max(Math.max(Math.max(a5, a6), Math.max(a7, a8)), Math.max(Math.max(a1, a2), Math.max(a3, a4)));
+    default boolean isEmpty() {
+        return false;
     }
 
-    static int min(int a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8)
-    {
-        return Math.min(Math.min(Math.min(a5, a6), Math.min(a7, a8)), Math.min(Math.min(a1, a2), Math.min(a3, a4)));
-    }
-
-    static void rotate(double x, double y, double z, int[] c)
-    {
-        if(x % 360 != 0)
-        {
-            rotateAroundX(Math.toRadians(x), c);
-        }
-
-        if(y % 360 != 0)
-        {
-            rotateAroundY(Math.toRadians(y), c);
-        }
-
-        if(z % 360 != 0)
-        {
-            rotateAroundZ(Math.toRadians(z), c);
-        }
-    }
-
-    static void rotateAroundX(double a, int[] c) {
-        rotateAroundX(Math.cos(a), Math.sin(a), c);
-    }
-
-    static void rotateAroundX(double cos, double sin, int[] c) {
-        int y = (int) Math.floor(cos * (double)(c[1]+0.5) - sin * (double)(c[2]+0.5));
-        int z = (int) Math.floor(sin * (double)(c[1]+0.5) + cos * (double)(c[2]+0.5));
-        c[1] = y;
-        c[2] = z;
-    }
-
-    static void rotateAroundY(double a, int[] c) {
-        rotateAroundY(Math.cos(a), Math.sin(a), c);
-    }
-
-    static void rotateAroundY(double cos, double sin, int[] c) {
-        int x = (int) Math.floor(cos * (double)(c[0]+0.5) + sin * (double)(c[2]+0.5));
-        int z = (int) Math.floor(-sin * (double)(c[0]+0.5) + cos * (double)(c[2]+0.5));
-        c[0] = x;
-        c[2] = z;
-    }
-
-    static void rotateAroundZ(double a, int[] c) {
-        rotateAroundZ(Math.cos(a), Math.sin(a), c);
-    }
-
-    static void rotateAroundZ(double cos, double sin, int[] c) {
-        int x = (int) Math.floor(cos * (double)(c[0]+0.5) - sin * (double)(c[1]+0.5));
-        int y = (int) Math.floor(sin * (double)(c[0]+0.5) + cos * (double)(c[1]+0.5));
-        c[0] = x;
-        c[1] = y;
+    default boolean contains(int x, int y, int z) {
+        return x < getWidth() && x >= 0 && y < getHeight() && y >= 0 && z < getDepth() && z >= 0;
     }
 }

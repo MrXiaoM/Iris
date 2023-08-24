@@ -20,31 +20,39 @@ package com.volmit.iris.engine.jigsaw;
 
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import com.volmit.iris.Iris;
-import com.volmit.iris.core.project.loader.IrisData;
-import com.volmit.iris.core.tools.IrisWorlds;
-import com.volmit.iris.engine.framework.EngineParallaxManager;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.object.basic.IrisPosition;
-import com.volmit.iris.engine.object.common.IObjectPlacer;
-import com.volmit.iris.engine.object.entity.IrisEntity;
-import com.volmit.iris.engine.object.feature.IrisFeature;
-import com.volmit.iris.engine.object.feature.IrisFeaturePositional;
-import com.volmit.iris.engine.object.jigsaw.IrisJigsawPiece;
-import com.volmit.iris.engine.object.jigsaw.IrisJigsawPieceConnector;
-import com.volmit.iris.engine.object.jigsaw.IrisJigsawStructure;
-import com.volmit.iris.engine.object.objects.*;
-import com.volmit.iris.engine.parallax.ParallaxChunkMeta;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.engine.data.cache.Cache;
+import com.volmit.iris.engine.object.IObjectPlacer;
+import com.volmit.iris.engine.object.IrisDirection;
+import com.volmit.iris.engine.object.IrisFeature;
+import com.volmit.iris.engine.object.IrisFeaturePositional;
+import com.volmit.iris.engine.object.IrisFeaturePotential;
+import com.volmit.iris.engine.object.IrisJigsawPiece;
+import com.volmit.iris.engine.object.IrisJigsawPieceConnector;
+import com.volmit.iris.engine.object.IrisJigsawStructure;
+import com.volmit.iris.engine.object.IrisObject;
+import com.volmit.iris.engine.object.IrisObjectPlacement;
+import com.volmit.iris.engine.object.IrisObjectRotation;
+import com.volmit.iris.engine.object.IrisPosition;
+import com.volmit.iris.engine.object.ObjectPlaceMode;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.interpolation.InterpolationMethod;
+import com.volmit.iris.util.mantle.Mantle;
 import com.volmit.iris.util.math.RNG;
 import lombok.Data;
 import org.bukkit.Axis;
-import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
+
+import java.util.function.Consumer;
 
 @Data
 public class PlannedStructure {
+    private static transient ConcurrentLinkedHashMap<String, IrisObject> objectRotationCache
+            = new ConcurrentLinkedHashMap.Builder<String, IrisObject>()
+            .initialCapacity(64)
+            .maximumWeightedCapacity(1024)
+            .concurrencyLevel(32)
+            .build();
     private KList<PlannedPiece> pieces;
     private IrisJigsawStructure structure;
     private IrisPosition position;
@@ -52,12 +60,6 @@ public class PlannedStructure {
     private RNG rng;
     private boolean verbose;
     private boolean terminating;
-    private static transient ConcurrentLinkedHashMap<String, IrisObject> objectRotationCache
-            = new ConcurrentLinkedHashMap.Builder<String, IrisObject>()
-            .initialCapacity(64)
-            .maximumWeightedCapacity(1024)
-            .concurrencyLevel(32)
-            .build();
 
     public PlannedStructure(IrisJigsawStructure structure, IrisPosition position, RNG rng) {
         terminating = false;
@@ -75,30 +77,28 @@ public class PlannedStructure {
 
         generateTerminators();
 
-        for(PlannedPiece i : pieces)
-        {
+        Iris.debug("JPlace: ROOT @ relative " + position.toString());
+
+        for (PlannedPiece i : pieces) {
             Iris.debug("Place: " + i.getObject().getLoadKey() + " at @ relative " + i.getPosition().toString());
         }
     }
 
-    public KList<Runnable> place(IObjectPlacer placer, EngineParallaxManager e) {
-        KList<Runnable> after = new KList<>();
+    public void place(IObjectPlacer placer, Mantle e, Consumer<Runnable> post) {
         IrisObjectPlacement options = new IrisObjectPlacement();
         options.getRotation().setEnabled(false);
         int startHeight = pieces.get(0).getPosition().getY();
 
         for (PlannedPiece i : pieces) {
-            if (i.getPiece().getPlaceMode().equals(ObjectPlaceMode.VACUUM)) {
+            if (i.getPiece().getPlacementOptions().usesFeatures()) {
                 place(i, startHeight, options, placer, e);
             } else {
-                after.add(() -> place(i, startHeight, options, placer, e));
+                post.accept(() -> place(i, startHeight, options, placer, e));
             }
         }
-
-        return after;
     }
 
-    public void place(PlannedPiece i, int startHeight, IrisObjectPlacement o, IObjectPlacer placer, EngineParallaxManager e) {
+    public void place(PlannedPiece i, int startHeight, IrisObjectPlacement o, IObjectPlacer placer, Mantle e) {
         IrisObjectPlacement options = o;
 
         if (i.getPiece().getPlacementOptions() != null) {
@@ -114,47 +114,29 @@ public class PlannedStructure {
         int sz = (v.getD() / 2);
         int xx = i.getPosition().getX() + sx;
         int zz = i.getPosition().getZ() + sz;
+        RNG rngf = new RNG(Cache.key(xx, zz));
         int offset = i.getPosition().getY() - startHeight;
-        int height = placer.getHighest(xx, zz, getData()) + offset + (v.getH() / 2);
+        int height = 0;
+
+        if (i.getStructure().getStructure().getLockY() == -1) {
+            if (i.getStructure().getStructure().getOverrideYRange() != null) {
+                height = (int) i.getStructure().getStructure().getOverrideYRange().get(rng, xx, zz, getData());
+            } else {
+                height = placer.getHighest(xx, zz, getData());
+            }
+        } else {
+            height = i.getStructure().getStructure().getLockY();
+        }
+
+        height += offset + (v.getH() / 2);
 
         if (options.getMode().equals(ObjectPlaceMode.PAINT) || options.isVacuum()) {
             height = -1;
         }
 
         int id = rng.i(0, Integer.MAX_VALUE);
-
-        int h = vo.place(xx, height, zz, placer, options, rng, (b) -> {
-            int xf = b.getX();
-            int yf = b.getY();
-            int zf = b.getZ();
-            e.getParallaxAccess().setObject(xf, yf, zf, v.getLoadKey() + "@" + id);
-            ParallaxChunkMeta meta = e.getParallaxAccess().getMetaRW(xf >> 4, zf >> 4);
-            meta.setObjects(true);
-            meta.setMinObject(Math.min(Math.max(meta.getMinObject(), 0), yf));
-            meta.setMaxObject(Math.max(Math.max(meta.getMaxObject(), 0), yf));
-        }, null, getData());
-
-
-        for (IrisJigsawPieceConnector j : i.getAvailableConnectors()) {
-            if (j.getSpawnEntity() != null)// && h != -1)
-            {
-                IrisPosition p;
-                if (j.getEntityPosition() == null) {
-                    p = i.getWorldPosition(j).add(new IrisPosition(j.getDirection().toVector().multiply(2)));
-                } else {
-                    p = i.getWorldPosition(j).add(j.getEntityPosition());
-                }
-
-                if (options.getMode().equals(ObjectPlaceMode.PAINT) || options.isVacuum()) {
-                    p.setY(placer.getHighest(xx, zz, getData()) + offset + (v.getH() / 2));
-                } else {
-                    p.setY(height);
-                }
-                for (int k = 0; k < j.getEntityCount(); k++) {
-                    e.getParallaxAccess().setEntity(p.getX(), p.getY(), p.getZ(), j.getSpawnEntity());
-                }
-            }
-        }
+        int h = vo.place(xx, height, zz, placer, options, rng, (b)
+                -> e.set(b.getX(), b.getY(), b.getZ(), v.getLoadKey() + "@" + id), null, getData());
 
         if (options.isVacuum()) {
             double a = Math.max(v.getW(), v.getD());
@@ -164,35 +146,20 @@ public class PlannedStructure {
             f.setInterpolationRadius(a / 4);
             f.setInterpolator(InterpolationMethod.BILINEAR_STARCAST_9);
             f.setStrength(1D);
-            e.getParallaxAccess().getMetaRW(xx >> 4, zz >> 4)
-                    .getFeatures()
-                    .add(new IrisFeaturePositional(xx, zz, f));
+            e.set(xx, 0, zz, new IrisFeaturePositional(xx, zz, f));
+        }
+
+        if (options.getAddFeatures().isNotEmpty()) {
+            for (IrisFeaturePotential j : options.getAddFeatures()) {
+                if (rngf.nextInt(j.getRarity()) == 0) {
+                    e.set(xx, 0, zz, new IrisFeaturePositional(xx, zz, j.getZone()));
+                }
+            }
         }
     }
 
     public void place(World world) {
         for (PlannedPiece i : pieces) {
-            Iris.sq(() -> {
-                for (IrisJigsawPieceConnector j : i.getAvailableConnectors()) {
-                    if (j.getSpawnEntity() != null) {
-                        IrisAccess a = IrisWorlds.access(world);
-                        if (a == null) {
-                            Iris.warn("Cannot spawn entities from jigsaw in non Iris world!");
-                            break;
-                        }
-                        IrisPosition p = i.getWorldPosition(j).add(new IrisPosition(j.getDirection().toVector().multiply(2)));
-                        IrisEntity e = getData().getEntityLoader().load(j.getSpawnEntity());
-
-                        if (a != null) {
-                            Entity entity = e.spawn(a.getCompound().getEngineForHeight(p.getY()), new Location(world, p.getX() + 0.5, p.getY(), p.getZ() + 0.5), rng);
-                            if (j.isKeepEntity()) {
-                                entity.setPersistent(true);
-                            }
-                        }
-                    }
-                }
-            });
-
             Iris.sq(() -> i.place(world));
         }
     }
@@ -262,8 +229,9 @@ public class PlannedStructure {
     }
 
     private boolean generateRotatedPiece(PlannedPiece piece, IrisJigsawPieceConnector pieceConnector, IrisJigsawPiece idea, IrisObjectRotation rotation) {
-        if (!idea.getPlacementOptions().getRotation().isEnabled())
-            rotation = piece.getRotation(); //Inherit parent rotation
+        if (!idea.getPlacementOptions().getRotation().isEnabled()) {
+            rotation = piece.getRotation();
+        }
 
         PlannedPiece test = new PlannedPiece(this, piece.getPosition(), idea, rotation);
 

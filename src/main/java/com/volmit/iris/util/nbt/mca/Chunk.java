@@ -18,35 +18,37 @@
 
 package com.volmit.iris.util.nbt.mca;
 
+import com.volmit.iris.Iris;
+import com.volmit.iris.core.nms.INMS;
 import com.volmit.iris.util.nbt.io.NBTDeserializer;
 import com.volmit.iris.util.nbt.io.NBTSerializer;
 import com.volmit.iris.util.nbt.io.NamedTag;
+import com.volmit.iris.util.nbt.mca.palette.BiomeContainer;
 import com.volmit.iris.util.nbt.tag.CompoundTag;
 import com.volmit.iris.util.nbt.tag.ListTag;
 
-import java.io.*;
-import java.util.Arrays;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static com.volmit.iris.util.nbt.mca.LoadFlags.*;
 
 public class Chunk {
-
-    public static final int DEFAULT_DATA_VERSION = 1628;
-
+    public static final int DEFAULT_DATA_VERSION = 2730;
+    private final AtomicReferenceArray<Section> sections = new AtomicReferenceArray<>(16);
     private boolean partial;
-
     private int lastMCAUpdate;
-
     private CompoundTag data;
-
     private int dataVersion;
     private long lastUpdate;
     private long inhabitedTime;
-    private int[] biomes;
+    private BiomeContainer biomes;
     private CompoundTag heightMaps;
     private CompoundTag carvingMasks;
-    private final AtomicReferenceArray<Section> sections = new AtomicReferenceArray<>(16);
     private ListTag<CompoundTag> entities;
     private ListTag<CompoundTag> tileEntities;
     private ListTag<CompoundTag> tileTicks;
@@ -70,6 +72,24 @@ public class Chunk {
     public Chunk(CompoundTag data) {
         this.data = data;
         initReferences(ALL_DATA);
+        setStatus("full");
+    }
+
+    public static Chunk newChunk() {
+        Chunk c = new Chunk(0);
+        c.dataVersion = DEFAULT_DATA_VERSION;
+        c.data = new CompoundTag();
+        c.biomes = INMS.get().newBiomeContainer(0, 256);
+        c.data.put("Level", defaultLevel());
+        c.status = "full";
+        return c;
+    }
+
+    private static CompoundTag defaultLevel() {
+        CompoundTag level = new CompoundTag();
+        level.putString("Status", "full");
+        level.putString("Generator", "Iris Headless " + Iris.instance.getDescription().getVersion());
+        return level;
     }
 
     private void initReferences(long loadFlags) {
@@ -84,7 +104,7 @@ public class Chunk {
         inhabitedTime = level.getLong("InhabitedTime");
         lastUpdate = level.getLong("LastUpdate");
         if ((loadFlags & BIOMES) != 0) {
-            biomes = level.getIntArray("Biomes");
+            biomes = INMS.get().newBiomeContainer(0, 256, level.getIntArray("Biomes"));
         }
         if ((loadFlags & HEIGHTMAPS) != 0) {
             heightMaps = level.getCompoundTag("Heightmaps");
@@ -161,6 +181,7 @@ public class Chunk {
         try (BufferedOutputStream nbtOut = new BufferedOutputStream(CompressionType.ZLIB.compress(baos))) {
             new NBTSerializer(false).toStream(new NamedTag(null, updateHandle(xPos, zPos)), nbtOut);
         }
+
         byte[] rawData = baos.toByteArray();
         raf.writeInt(rawData.length + 1); // including the byte to store the compression type
         raf.writeByte(CompressionType.ZLIB.getID());
@@ -202,21 +223,6 @@ public class Chunk {
     }
 
     /**
-     * @deprecated Use {@link #getBiomeAt(int, int, int)} instead
-     */
-    @Deprecated
-    public int getBiomeAt(int blockX, int blockZ) {
-        if (dataVersion < 2202) {
-            if (biomes == null || biomes.length != 256) {
-                return -1;
-            }
-            return biomes[getBlockIndex(blockX, blockZ)];
-        } else {
-            throw new IllegalStateException("cannot get biome using Chunk#getBiomeAt(int,int) from biome data with DataVersion of 2202 or higher, use Chunk#getBiomeAt(int,int,int) instead");
-        }
-    }
-
-    /**
      * Fetches a biome id at a specific block in this chunk.
      * The coordinates can be absolute coordinates or relative to the region or chunk.
      *
@@ -225,45 +231,8 @@ public class Chunk {
      * @param blockZ The z-coordinate of the block.
      * @return The biome id or -1 if the biomes are not correctly initialized.
      */
-    public int getBiomeAt(int blockX, int blockY, int blockZ) {
-        if (dataVersion < 2202) {
-            if (biomes == null || biomes.length != 256) {
-                return -1;
-            }
-            return biomes[getBlockIndex(blockX, blockZ)];
-        } else {
-            if (biomes == null || biomes.length != 1024) {
-                return -1;
-            }
-            int biomeX = (blockX & 0xF) >> 2;
-            int biomeY = (blockY & 0xF) >> 2;
-            int biomeZ = (blockZ & 0xF) >> 2;
-
-            return biomes[getBiomeIndex(biomeX, biomeY, biomeZ)];
-        }
-    }
-
-    @Deprecated
-    public void setBiomeAt(int blockX, int blockZ, int biomeID) {
-        if (dataVersion < 2202) {
-            if (biomes == null || biomes.length != 256) {
-                biomes = new int[256];
-                Arrays.fill(biomes, -1);
-            }
-            biomes[getBlockIndex(blockX, blockZ)] = biomeID;
-        } else {
-            if (biomes == null || biomes.length != 1024) {
-                biomes = new int[1024];
-                Arrays.fill(biomes, -1);
-            }
-
-            int biomeX = (blockX & 0xF) >> 2;
-            int biomeZ = (blockZ & 0xF) >> 2;
-
-            for (int y = 0; y < 64; y++) {
-                biomes[getBiomeIndex(biomeX, y, biomeZ)] = biomeID;
-            }
-        }
+    public synchronized int getBiomeAt(int blockX, int blockY, int blockZ) {
+        return biomes.getBiome(blockX, blockY, blockZ);
     }
 
     /**
@@ -275,24 +244,8 @@ public class Chunk {
      * @param biomeID The biome id to be set.
      *                When set to a negative number, Minecraft will replace it with the block column's default biome.
      */
-    public void setBiomeAt(int blockX, int blockY, int blockZ, int biomeID) {
-        if (dataVersion < 2202) {
-            if (biomes == null || biomes.length != 256) {
-                biomes = new int[256];
-                Arrays.fill(biomes, -1);
-            }
-            biomes[getBlockIndex(blockX, blockZ)] = biomeID;
-        } else {
-            if (biomes == null || biomes.length != 1024) {
-                biomes = new int[1024];
-                Arrays.fill(biomes, -1);
-            }
-
-            int biomeX = (blockX & 0xF) >> 2;
-            int biomeZ = (blockZ & 0xF) >> 2;
-
-            biomes[getBiomeIndex(biomeX, blockY, biomeZ)] = biomeID;
-        }
+    public synchronized void setBiomeAt(int blockX, int blockY, int blockZ, int biomeID) {
+        biomes.setBiome(blockX, blockY, blockZ, biomeID);
     }
 
     int getBiomeIndex(int biomeX, int biomeY, int biomeZ) {
@@ -428,29 +381,6 @@ public class Chunk {
      */
     public void setInhabitedTime(long inhabitedTime) {
         this.inhabitedTime = inhabitedTime;
-    }
-
-    /**
-     * @return A matrix of biome IDs for all block columns in this chunk.
-     */
-    public int[] getBiomes() {
-        return biomes;
-    }
-
-    /**
-     * Sets the biome IDs for this chunk.
-     *
-     * @param biomes The biome ID matrix of this chunk. Must have a length of <code>256</code>.
-     * @throws IllegalArgumentException When the biome matrix does not have a length of <code>256</code>
-     *                                  or is <code>null</code>
-     */
-    public void setBiomes(int[] biomes) {
-        if (biomes != null) {
-            if (dataVersion < 2202 && biomes.length != 256 || dataVersion >= 2202 && biomes.length != 1024) {
-                throw new IllegalArgumentException("biomes array must have a length of " + (dataVersion < 2202 ? "256" : "1024"));
-            }
-        }
-        this.biomes = biomes;
     }
 
     /**
@@ -642,15 +572,6 @@ public class Chunk {
         }
     }
 
-    public static Chunk newChunk() {
-        Chunk c = new Chunk(0);
-        c.dataVersion = DEFAULT_DATA_VERSION;
-        c.data = new CompoundTag();
-        c.data.put("Level", new CompoundTag());
-        c.status = "mobs_spawned";
-        return c;
-    }
-
     public CompoundTag updateHandle(int xPos, int zPos) {
         data.putInt("DataVersion", dataVersion);
         CompoundTag level = data.getCompoundTag("Level");
@@ -658,11 +579,7 @@ public class Chunk {
         level.putInt("zPos", zPos);
         level.putLong("LastUpdate", lastUpdate);
         level.putLong("InhabitedTime", inhabitedTime);
-        if (dataVersion < 2202) {
-            if (biomes != null && biomes.length == 256) level.putIntArray("Biomes", biomes);
-        } else {
-            if (biomes != null && biomes.length == 1024) level.putIntArray("Biomes", biomes);
-        }
+        level.putIntArray("Biomes", biomes.getData());
         if (heightMaps != null) level.put("Heightmaps", heightMaps);
         if (carvingMasks != null) level.put("CarvingMasks", carvingMasks);
         if (entities != null) level.put("Entities", entities);
@@ -687,15 +604,5 @@ public class Chunk {
 
     public int sectionCount() {
         return sections.length();
-    }
-
-    public void runLighting() {
-        for (int s = 15; s >= 0; s--) {
-            Section section = getSection(s);
-
-            if (section != null) {
-                section.runLighting();
-            }
-        }
     }
 }

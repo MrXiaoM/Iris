@@ -25,7 +25,6 @@ import com.volmit.iris.engine.framework.EnginePlayer;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -46,17 +45,14 @@ public class IrisEngineEffects extends EngineAssignedComponent implements Engine
     public void updatePlayerMap() {
         List<Player> pr = getEngine().getWorld().getPlayers();
 
-        if (pr == null) return; //Fix for paper returning a world with a null playerlist
+        if (pr == null) {
+            return;
+        }
 
         for (Player i : pr) {
-            Location l = i.getLocation();
             boolean pcc = players.containsKey(i.getUniqueId());
-            if (getEngine().contains(l)) {
-                if (!pcc) {
-                    players.put(i.getUniqueId(), new EnginePlayer(getEngine(), i));
-                }
-            } else if (pcc) {
-                players.remove(i.getUniqueId());
+            if (!pcc) {
+                players.put(i.getUniqueId(), new EnginePlayer(getEngine(), i));
             }
         }
 

@@ -21,11 +21,11 @@ package com.volmit.iris.util.matter;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.data.Varint;
 import com.volmit.iris.util.hunk.Hunk;
-import com.volmit.iris.util.hunk.storage.MappedHunk;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
-import org.objectweb.asm.ClassWriter;
+import org.bukkit.util.BlockVector;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -42,63 +42,55 @@ public interface MatterSlice<T> extends Hunk<T> {
 
     <W> MatterReader<W, T> readFrom(Class<W> mediumType);
 
-    default Class<?> getClass(Object w)
-    {
+    default Class<?> getClass(Object w) {
         Class<?> c = w.getClass();
 
-        if(w instanceof World)
-        {
+        if (w instanceof World) {
             c = World.class;
-        }else if(w instanceof BlockData)
-        {
+        } else if (w instanceof BlockData) {
             c = BlockData.class;
-        }else if(w instanceof Entity)
-        {
+        } else if (w instanceof Entity) {
             c = Entity.class;
         }
 
         return c;
     }
 
-    default <W> boolean writeInto(W w, int x, int y, int z)
-    {
+    default boolean writeInto(Location location) {
+        return writeInto(location.getWorld(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+
+    default <W> boolean writeInto(W w, int x, int y, int z) {
         MatterWriter<W, T> injector = (MatterWriter<W, T>) writeInto(getClass(w));
 
-        if(injector == null)
-        {
+        if (injector == null) {
             return false;
         }
 
-        for(int i = x; i < x + getWidth(); i++)
-        {
-            for(int j = y; j < y + getHeight(); j++)
-            {
-                for(int k = z; k < z + getDepth(); k++)
-                {
-                    injector.writeMatter(w, get(i - x, j - y, k - z), i, j, k);
-                }
-            }
-        }
+        iterateSync((a, b, c, t) -> injector.writeMatter(w, t, a + x, b + y, c + z));
 
         return true;
     }
 
-    default <W> boolean readFrom(W w, int x, int y, int z)
-    {
+    default boolean readFrom(Location location) {
+        return readFrom(location.getWorld(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+
+    default <W> boolean readFrom(W w, int x, int y, int z) {
         MatterReader<W, T> ejector = (MatterReader<W, T>) readFrom(getClass(w));
 
-        if(ejector == null)
-        {
+        if (ejector == null) {
             return false;
         }
 
-        for(int i = x; i < x + getWidth(); i++)
-        {
-            for(int j = y; j < y + getHeight(); j++)
-            {
-                for(int k = z; k < z + getDepth(); k++)
-                {
-                    set(i - x, j - y, k - z, ejector.readMatter(w, i, j, k));
+        for (int i = x; i < x + getWidth(); i++) {
+            for (int j = y; j < y + getHeight(); j++) {
+                for (int k = z; k < z + getDepth(); k++) {
+                    T v = ejector.readMatter(w, i, j, k);
+
+                    if (v != null) {
+                        set(i - x, j - y, k - z, v);
+                    }
                 }
             }
         }
@@ -106,23 +98,24 @@ public interface MatterSlice<T> extends Hunk<T> {
         return true;
     }
 
-    // BlockMatter<T>
-    //   RawMatter<T>      ex MappedHunk<T>
-    //     IMatterSlice<T> ex Hunk<T>
-
-    default int getCount()
-    {
-        return ((MappedHunk<?>)this).getEntryCount();
-    }
-
-    default boolean canWrite(Class<?> mediumType)
-    {
+    default boolean canWrite(Class<?> mediumType) {
         return writeInto(mediumType) != null;
     }
 
-    default boolean canRead(Class<?> mediumType)
-    {
+    default boolean canRead(Class<?> mediumType) {
         return readFrom(mediumType) != null;
+    }
+
+    default int getBitsPer(int needed) {
+        int target = 1;
+        for (int i = 1; i < 8; i++) {
+            if (Math.pow(2, i) > needed) {
+                target = i;
+                break;
+            }
+        }
+
+        return target;
     }
 
     default void write(DataOutputStream dos) throws IOException {
@@ -132,29 +125,49 @@ public interface MatterSlice<T> extends Hunk<T> {
         MatterPalette<T> palette = new MatterPalette<T>(this);
         iterateSync((x, y, z, b) -> palette.assign(b));
         palette.writePalette(dos);
-        Varint.writeUnsignedVarInt(getCount(), dos);
-        iterateSyncIO((x, y, z, b) -> {
-            Varint.writeUnsignedVarInt(Cache.to1D(x, y, z, w, h), dos);
-            palette.writeNode(b, dos);
-        });
+        dos.writeBoolean(isMapped());
+
+        if (isMapped()) {
+            Varint.writeUnsignedVarInt(getEntryCount(), dos);
+            iterateSyncIO((x, y, z, b) -> {
+                Varint.writeUnsignedVarInt(Cache.to1D(x, y, z, w, h), dos);
+                palette.writeNode(b, dos);
+            });
+        } else {
+            iterateSyncIO((x, y, z, b) -> palette.writeNode(b, dos));
+        }
     }
 
     default void read(DataInputStream din) throws IOException {
         int w = getWidth();
         int h = getHeight();
-
         MatterPalette<T> palette = new MatterPalette<T>(this, din);
-        int nodes = Varint.readUnsignedVarInt(din);
-        int[] pos;
+        if (din.readBoolean()) {
+            int nodes = Varint.readUnsignedVarInt(din);
+            int[] pos;
 
-        while (nodes-- > 0) {
-            pos = Cache.to3D(Varint.readUnsignedVarInt(din), w, h);
-            setRaw(pos[0], pos[1], pos[2], palette.readNode(din));
+            while (nodes-- > 0) {
+                pos = Cache.to3D(Varint.readUnsignedVarInt(din), w, h);
+                setRaw(pos[0], pos[1], pos[2], palette.readNode(din));
+            }
+        } else {
+            iterateSyncIO((x, y, z, b) -> setRaw(x, y, z, palette.readNode(din)));
         }
     }
 
-    default void rotateSliceInto(Matter n, double x, double y, double z)
-    {
-        rotate(x,y,z, (_x, _y, _z) -> n.slice(getType()));
+    default void rotateSliceInto(Matter n, double x, double y, double z) {
+        rotate(x, y, z, (_x, _y, _z) -> n.slice(getType()));
+    }
+
+    default boolean containsKey(BlockVector v) {
+        return get(v.getBlockX(), v.getBlockY(), v.getBlockZ()) != null;
+    }
+
+    default void put(BlockVector v, T d) {
+        set(v.getBlockX(), v.getBlockY(), v.getBlockZ(), d);
+    }
+
+    default T get(BlockVector v) {
+        return get(v.getBlockX(), v.getBlockY(), v.getBlockZ());
     }
 }

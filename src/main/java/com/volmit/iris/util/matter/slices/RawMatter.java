@@ -21,8 +21,8 @@ package com.volmit.iris.util.matter.slices;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.hunk.storage.MappedHunk;
 import com.volmit.iris.util.matter.MatterReader;
-import com.volmit.iris.util.matter.MatterWriter;
 import com.volmit.iris.util.matter.MatterSlice;
+import com.volmit.iris.util.matter.MatterWriter;
 import lombok.Getter;
 
 import java.io.DataInputStream;
@@ -30,38 +30,34 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public abstract class RawMatter<T> extends MappedHunk<T> implements MatterSlice<T> {
+    protected final KMap<Class<?>, MatterWriter<?, T>> writers;
+    protected final KMap<Class<?>, MatterReader<?, T>> readers;
     @Getter
     private final Class<T> type;
-    private final KMap<Class<?>, MatterWriter<?, T>> injectors;
-    private final KMap<Class<?>, MatterReader<?, T>> ejectors;
 
     public RawMatter(int width, int height, int depth, Class<T> type) {
         super(width, height, depth);
-        injectors = new KMap<>();
-        ejectors = new KMap<>();
+        writers = new KMap<>();
+        readers = new KMap<>();
         this.type = type;
     }
 
-    protected <W> void registerWriter(Class<W> mediumType, MatterWriter<W, T> injector)
-    {
-        injectors.put(mediumType, injector);
+    protected <W> void registerWriter(Class<W> mediumType, MatterWriter<W, T> injector) {
+        writers.put(mediumType, injector);
     }
 
-    protected <W> void registerReader(Class<W> mediumType, MatterReader<W, T> injector)
-    {
-        ejectors.put(mediumType, injector);
-    }
-
-    @Override
-    public <W> MatterWriter<W, T> writeInto(Class<W> mediumType)
-    {
-        return (MatterWriter<W, T>) injectors.get(mediumType);
+    protected <W> void registerReader(Class<W> mediumType, MatterReader<W, T> injector) {
+        readers.put(mediumType, injector);
     }
 
     @Override
-    public <W> MatterReader<W, T> readFrom(Class<W> mediumType)
-    {
-        return (MatterReader<W, T>) ejectors.get(mediumType);
+    public <W> MatterWriter<W, T> writeInto(Class<W> mediumType) {
+        return (MatterWriter<W, T>) writers.get(mediumType);
+    }
+
+    @Override
+    public <W> MatterReader<W, T> readFrom(Class<W> mediumType) {
+        return (MatterReader<W, T>) readers.get(mediumType);
     }
 
     @Override

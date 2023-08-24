@@ -32,12 +32,16 @@ public class IrisEngineEvent extends Event {
     private static final HandlerList handlers = new HandlerList();
     private Engine engine;
 
-    @Override
-    public HandlerList getHandlers() {
-        return handlers;
+    public IrisEngineEvent() {
+        super(true);
     }
 
     public static HandlerList getHandlerList() {
+        return handlers;
+    }
+
+    @Override
+    public HandlerList getHandlers() {
         return handlers;
     }
 }

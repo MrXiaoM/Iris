@@ -18,6 +18,8 @@
 
 package com.volmit.iris.core.nms;
 
+import com.volmit.iris.util.nbt.mca.palette.BiomeContainer;
+import com.volmit.iris.util.nbt.mca.palette.PaletteAccess;
 import com.volmit.iris.util.nbt.tag.CompoundTag;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -27,6 +29,16 @@ import org.bukkit.entity.Entity;
 import org.bukkit.generator.ChunkGenerator;
 
 public interface INMSBinding {
+    boolean hasTile(Location l);
+
+    CompoundTag serializeTile(Location location);
+
+    void deserializeTile(CompoundTag s, Location newPosition);
+
+    CompoundTag serializeEntity(Entity location);
+
+    Entity deserializeEntity(CompoundTag s, Location newPosition);
+
     boolean supportsCustomHeight();
 
     Object getBiomeBaseFromId(int id);
@@ -53,6 +65,10 @@ public interface INMSBinding {
 
     int getBiomeId(Biome biome);
 
+    BiomeContainer newBiomeContainer(int min, int max, int[] data);
+
+    BiomeContainer newBiomeContainer(int min, int max);
+
     default World createWorld(WorldCreator c) {
         return c.createWorld();
     }
@@ -64,4 +80,6 @@ public interface INMSBinding {
     default boolean supportsDataPacks() {
         return false;
     }
+
+    PaletteAccess createPalette();
 }

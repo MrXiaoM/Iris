@@ -34,13 +34,17 @@ public interface TerrainChunk extends BiomeGrid, ChunkData {
         return new LinkedTerrainChunk(world, grid);
     }
 
+    static TerrainChunk createUnsafe(World world, BiomeGrid grid) {
+        LinkedTerrainChunk ltc = new LinkedTerrainChunk(world, grid);
+        ltc.setUnsafe(true);
+        return ltc;
+    }
+
     static TerrainChunk create(ChunkData raw, BiomeGrid grid) {
         return new LinkedTerrainChunk(grid, raw);
     }
 
     BiomeBaseInjector getBiomeBaseInjector();
-
-    void setRaw(ChunkData data);
 
     /**
      * Get biome at x, z within chunk being generated
@@ -122,6 +126,8 @@ public interface TerrainChunk extends BiomeGrid, ChunkData {
     BlockData getBlockData(int x, int y, int z);
 
     ChunkData getRaw();
+
+    void setRaw(ChunkData data);
 
     void inject(BiomeGrid biome);
 }

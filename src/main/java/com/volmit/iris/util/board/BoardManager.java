@@ -33,22 +33,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BoardManager {
 
     private final JavaPlugin plugin;
-
-
-    private BoardSettings boardSettings;
-
-
     private final Map<UUID, Board> scoreboards;
-
-
     private final BukkitTask updateTask;
+    private BoardSettings boardSettings;
 
 
     public BoardManager(JavaPlugin plugin, BoardSettings boardSettings) {
         this.plugin = plugin;
         this.boardSettings = boardSettings;
         this.scoreboards = new ConcurrentHashMap<>();
-        this.updateTask = new BoardUpdateTask(this).runTaskTimer(plugin, 2L, 2L);
+        this.updateTask = new BoardUpdateTask(this).runTaskTimer(plugin, 2L, 20L);
         plugin.getServer().getOnlinePlayers().forEach(this::setup);
     }
 

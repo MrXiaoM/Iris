@@ -18,10 +18,10 @@
 
 package com.volmit.iris.engine.framework.placer;
 
-import com.volmit.iris.core.project.loader.IrisData;
-import com.volmit.iris.engine.object.common.IObjectPlacer;
-import com.volmit.iris.engine.object.objects.IrisObjectPlacement;
-import com.volmit.iris.engine.object.tile.TileData;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.engine.object.IObjectPlacer;
+import com.volmit.iris.engine.object.IrisObjectPlacement;
+import com.volmit.iris.engine.object.TileData;
 import com.volmit.iris.util.math.RNG;
 import org.bukkit.block.TileState;
 import org.bukkit.block.data.BlockData;
@@ -55,6 +55,11 @@ public class HeightmapObjectPlacer implements IObjectPlacer {
 
     public boolean isPreventingDecay() {
         return oplacer.isPreventingDecay();
+    }
+
+    @Override
+    public boolean isCarved(int x, int y, int z) {
+        return false;
     }
 
     public boolean isSolid(int param1Int1, int param1Int2, int param1Int3) {

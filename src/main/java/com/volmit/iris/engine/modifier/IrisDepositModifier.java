@@ -20,13 +20,15 @@ package com.volmit.iris.engine.modifier;
 
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedModifier;
-import com.volmit.iris.engine.object.biome.IrisBiome;
-import com.volmit.iris.engine.object.deposits.IrisDepositGenerator;
-import com.volmit.iris.engine.object.objects.IrisObject;
-import com.volmit.iris.engine.object.regional.IrisRegion;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisDepositGenerator;
+import com.volmit.iris.engine.object.IrisObject;
+import com.volmit.iris.engine.object.IrisRegion;
+import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.data.HeightMap;
 import com.volmit.iris.util.hunk.Hunk;
 import com.volmit.iris.util.math.RNG;
+import com.volmit.iris.util.parallel.BurstExecutor;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.util.BlockVector;
@@ -36,36 +38,38 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
 
     public IrisDepositModifier(Engine engine) {
         super(engine, "Deposit");
-        rng = new RNG(getEngine().getWorld().seed() + 12938).nextParallelRNG(28348777);
+        rng = new RNG(getEngine().getSeedManager().getDeposit());
     }
 
     @Override
     public void onModify(int x, int z, Hunk<BlockData> output, boolean multicore) {
         PrecisionStopwatch p = PrecisionStopwatch.start();
-        generateDeposits(rng, output, Math.floorDiv(x, 16), Math.floorDiv(z, 16));
+        generateDeposits(rng, output, Math.floorDiv(x, 16), Math.floorDiv(z, 16), multicore);
         getEngine().getMetrics().getDeposit().put(p.getMilliseconds());
     }
 
-    public void generateDeposits(RNG rx, Hunk<BlockData> terrain, int x, int z) {
+    public void generateDeposits(RNG rx, Hunk<BlockData> terrain, int x, int z, boolean multicore) {
         RNG ro = rx.nextParallelRNG(x * x).nextParallelRNG(z * z);
         IrisRegion region = getComplex().getRegionStream().get((x * 16) + 7, (z * 16) + 7);
         IrisBiome biome = getComplex().getTrueBiomeStream().get((x * 16) + 7, (z * 16) + 7);
+        BurstExecutor burst = burst().burst(multicore);
 
         for (IrisDepositGenerator k : getDimension().getDeposits()) {
-            generate(k, terrain, ro, x, z, false);
+            burst.queue(() -> generate(k, terrain, ro, x, z, false));
         }
 
         for (IrisDepositGenerator k : region.getDeposits()) {
             for (int l = 0; l < ro.i(k.getMinPerChunk(), k.getMaxPerChunk()); l++) {
-                generate(k, terrain, ro, x, z, false);
+                burst.queue(() -> generate(k, terrain, ro, x, z, false));
             }
         }
 
         for (IrisDepositGenerator k : biome.getDeposits()) {
             for (int l = 0; l < ro.i(k.getMinPerChunk(), k.getMaxPerChunk()); l++) {
-                generate(k, terrain, ro, x, z, false);
+                burst.queue(() -> generate(k, terrain, ro, x, z, false));
             }
         }
+        burst.complete();
     }
 
     public void generate(IrisDepositGenerator k, Hunk<BlockData> data, RNG rng, int cx, int cz, boolean safe) {
@@ -117,20 +121,8 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
                     continue;
                 }
 
-                boolean allow = false;
-
-                BlockData b = data.get(nx, ny, nz);
-                if (b != null) {
-                    for (BlockData f : getDimension().getRockPalette().getBlockData(getData())) {
-                        if (f.getMaterial().equals(b.getMaterial())) {
-                            allow = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (allow) {
-                    data.set(nx, ny, nz, clump.getBlocks().get(j));
+                if (!getEngine().getMantle().isCarved((cx << 4) + nx, ny, (cz << 4) + nz)) {
+                    data.set(nx, ny, nz, B.toDeepSlateOre(data.get(nx, ny, nz), clump.getBlocks().get(j)));
                 }
             }
         }

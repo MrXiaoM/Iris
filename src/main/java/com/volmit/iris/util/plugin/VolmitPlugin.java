@@ -27,15 +27,15 @@ import com.volmit.iris.util.reflect.V;
 import com.volmit.iris.util.scheduling.J;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
-import org.bukkit.command.*;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.permissions.PermissionDefault;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -43,11 +43,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
-import java.net.URLClassLoader;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
 
 @SuppressWarnings("EmptyMethod")
 public abstract class VolmitPlugin extends JavaPlugin implements Listener {
@@ -55,103 +53,6 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
     private KMap<KList<String>, VirtualCommand> commands;
     private KList<MortarCommand> commandCache;
     private KList<MortarPermission> permissionCache;
-    private KMap<String, IController> controllers;
-    private KList<IController> cachedControllers;
-    private KMap<Class<? extends IController>, IController> cachedClassControllers;
-
-    public void selfDistruct() {
-        HandlerList.unregisterAll((Plugin) this);
-        getServer().getScheduler().cancelTasks(this);
-        File me = getFile();
-        Plugin plugin = this;
-        String name = plugin.getName();
-        SimpleCommandMap commandMap = null;
-        List<Plugin> plugins = null;
-        Map<String, Plugin> names = null;
-        Map<String, Command> commands = null;
-        Map<Event, SortedSet<RegisteredListener>> listeners = null;
-
-        try {
-
-            Field pluginsField = Bukkit.getPluginManager().getClass().getDeclaredField("plugins");
-            pluginsField.setAccessible(true);
-            //noinspection unchecked
-            plugins = (List<Plugin>) pluginsField.get(getServer().getPluginManager());
-            Field lookupNamesField = Bukkit.getPluginManager().getClass().getDeclaredField("lookupNames");
-            lookupNamesField.setAccessible(true);
-            //noinspection unchecked
-            names = (Map<String, Plugin>) lookupNamesField.get(getServer().getPluginManager());
-
-            try {
-                Field listenersField = Bukkit.getPluginManager().getClass().getDeclaredField("listeners");
-                listenersField.setAccessible(true);
-                //noinspection unchecked
-                listeners = (Map<Event, SortedSet<RegisteredListener>>) listenersField.get(getServer().getPluginManager());
-            } catch (Throwable e) {
-                Iris.reportError(e);
-
-            }
-
-            Field commandMapField = Bukkit.getPluginManager().getClass().getDeclaredField("commandMap");
-            commandMapField.setAccessible(true);
-            commandMap = (SimpleCommandMap) commandMapField.get(getServer().getPluginManager());
-            Field knownCommandsField = SimpleCommandMap.class.getDeclaredField("knownCommands");
-            knownCommandsField.setAccessible(true);
-            //noinspection unchecked
-            commands = (Map<String, Command>) knownCommandsField.get(commandMap);
-
-        } catch (Throwable e) {
-            Iris.reportError(e);
-
-        }
-
-        getServer().getPluginManager().disablePlugin(plugin);
-        plugins.remove(plugin);
-        names.remove(name);
-
-        if (listeners != null) {
-            for (SortedSet<RegisteredListener> set : listeners.values()) {
-                set.removeIf(value -> value.getPlugin().equals(plugin));
-            }
-        }
-
-        for (Iterator<Map.Entry<String, Command>> it = commands.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, Command> entry = it.next();
-            if (entry.getValue() instanceof PluginCommand) {
-                PluginCommand c = (PluginCommand) entry.getValue();
-                if (c.getPlugin() == plugin) {
-                    c.unregister(commandMap);
-                    it.remove();
-                }
-            }
-        }
-
-        new Thread(() -> {
-            // Attempt to close the classloader to unlock any handles on the
-            // plugin's
-            // jar file.
-            ClassLoader cl = plugin.getClass().getClassLoader();
-
-            if (cl instanceof URLClassLoader) {
-                try {
-                    ((URLClassLoader) cl).close();
-                } catch (IOException e) {
-                    Iris.reportError(e);
-
-                }
-            }
-
-            // Will not work on processes started with the -XX:+DisableExplicitGC
-            // flag,
-            // but lets try it anyway. This tries to get around the issue where
-            // Windows
-            // refuses to unlock jar files that were previously loaded into the JVM.
-            System.gc();
-            if (!me.delete()) {
-                me.deleteOnExit();
-            }
-        }).start();
-    }
 
     public File getJarFile() {
         return getFile();
@@ -177,15 +78,12 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
         registerInstance();
         registerPermissions();
         registerCommands();
-        registerControllers();
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::tickControllers, 0, 0);
         J.a(this::outputInfo);
         registerListener(this);
         start();
     }
 
     public void unregisterAll() {
-        stopControllers();
         unregisterListeners();
         unregisterCommands();
         unregisterPermissions();
@@ -354,16 +252,6 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
         unregisterAll();
     }
 
-    private void tickControllers() {
-        if (bad) {
-            return;
-        }
-
-        for (IController i : getControllers()) {
-            tickController(i);
-        }
-    }
-
     private void tickController(IController i) {
         if (bad) {
             return;
@@ -382,62 +270,6 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
                 e.printStackTrace();
                 Iris.reportError(e);
             }
-        }
-    }
-
-    public KList<IController> getControllers() {
-        if (bad) {
-            return new KList<>();
-        }
-
-        return cachedControllers;
-    }
-
-    private void registerControllers() {
-        if (bad) {
-            return;
-        }
-        controllers = new KMap<>();
-        cachedClassControllers = new KMap<>();
-
-        for (Field i : getClass().getDeclaredFields()) {
-            if (i.isAnnotationPresent(Control.class)) {
-                try {
-                    i.setAccessible(true);
-                    IController pc = (IController) i.getType().getConstructor().newInstance();
-                    registerController(pc);
-                    i.set(this, pc);
-                    v("Registered " + pc.getName() + " (" + i.getName() + ")");
-                } catch (IllegalArgumentException | IllegalAccessException | InstantiationException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-                    w("Failed to register controller (field " + i.getName() + ")");
-                    e.printStackTrace();
-                    Iris.reportError(e);
-                }
-            }
-        }
-
-        cachedControllers = controllers.v();
-    }
-
-    public IController getController(Class<? extends IController> c) {
-        return cachedClassControllers.get(c);
-    }
-
-    private void registerController(IController pc) {
-        if (bad) {
-            return;
-        }
-        controllers.put(pc.getName(), pc);
-        cachedClassControllers.put(pc.getClass(), pc);
-        registerListener(pc);
-
-        try {
-            pc.start();
-            v("Started " + pc.getName());
-        } catch (Throwable e) {
-            w("Failed to start controller " + pc.getName());
-            e.printStackTrace();
-            Iris.reportError(e);
         }
     }
 
@@ -619,16 +451,12 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
     }
 
     public void registerListener(Listener l) {
-        if (bad) {
-            return;
-        }
+        Iris.debug("Register Listener " + l.getClass().getSimpleName());
         Bukkit.getPluginManager().registerEvents(l, this);
     }
 
     public void unregisterListener(Listener l) {
-        if (bad) {
-            return;
-        }
+        Iris.debug("Register Listener " + l.getClass().getSimpleName());
         HandlerList.unregisterAll(l);
     }
 
@@ -663,23 +491,6 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    private void stopControllers() {
-        if (bad) {
-            return;
-        }
-        for (IController i : controllers.v()) {
-            try {
-                unregisterListener(i);
-                i.stop();
-                v("Stopped " + i.getName());
-            } catch (Throwable e) {
-                Iris.reportError(e);
-                w("Failed to stop controller " + i.getName());
-                e.printStackTrace();
-            }
-        }
-    }
-
     public File getDataFile(String... strings) {
         File f = new File(getDataFolder(), new KList<>(strings).toString(File.separator));
         f.getParentFile().mkdirs();
@@ -701,6 +512,16 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
 
         File f = new File(getDataFolder(), new KList<>(strings).toString(File.separator));
         f.mkdirs();
+
+        return f;
+    }
+
+    public File getDataFolderNoCreate(String... strings) {
+        if (strings.length == 0) {
+            return super.getDataFolder();
+        }
+
+        File f = new File(getDataFolder(), new KList<>(strings).toString(File.separator));
 
         return f;
     }

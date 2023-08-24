@@ -20,66 +20,53 @@ package com.volmit.iris.util.parallel;
 
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
+import com.volmit.iris.core.service.PreservationSVC;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.math.M;
-import com.volmit.iris.util.scheduling.J;
-import com.volmit.iris.util.scheduling.Looper;
 
-import java.util.concurrent.*;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MultiBurst {
-    public static final MultiBurst burst = new MultiBurst("Iris", IrisSettings.get().getConcurrency().getMiscThreadPriority(), IrisSettings.getThreadCount(IrisSettings.get().getConcurrency().getMiscThreadCount()));
-    private ExecutorService service;
-    private final Looper heartbeat;
+    public static final MultiBurst burst = new MultiBurst();
     private final AtomicLong last;
-    private int tid;
     private final String name;
-    private final int tc;
     private final int priority;
+    private ExecutorService service;
 
-    public MultiBurst(int tc) {
-        this("Iris", 6, tc);
+    public MultiBurst() {
+        this("Iris", Thread.MIN_PRIORITY);
     }
 
-    public MultiBurst(String name, int priority, int tc) {
+    public MultiBurst(String name, int priority) {
         this.name = name;
         this.priority = priority;
-        this.tc = tc;
         last = new AtomicLong(M.ms());
-        heartbeat = new Looper() {
-            @Override
-            protected long loop() {
-                if (M.ms() - last.get() > TimeUnit.MINUTES.toMillis(1) && service != null) {
-                    service.shutdown();
-                    service = null;
-                    Iris.debug("Shutting down MultiBurst Pool " + getName() + " to conserve resource.");
-                }
-
-                return 60000;
-            }
-        };
-        heartbeat.setName(name);
-        heartbeat.start();
+        Iris.service(PreservationSVC.class).register(this);
     }
 
     private synchronized ExecutorService getService() {
         last.set(M.ms());
         if (service == null || service.isShutdown()) {
-            service = Executors.newFixedThreadPool(Math.max(tc, 1), r -> {
-                tid++;
-                Thread t = new Thread(r);
-                t.setName(name + " " + tid);
-                t.setPriority(priority);
-                t.setUncaughtExceptionHandler((et, e) ->
-                {
-                    Iris.info("Exception encountered in " + et.getName());
-                    e.printStackTrace();
-                });
+            service = new ForkJoinPool(IrisSettings.getThreadCount(IrisSettings.get().getConcurrency().getParallelism()),
+                    new ForkJoinPool.ForkJoinWorkerThreadFactory() {
+                        int m = 0;
 
-                return t;
-            });
-            Iris.debug("Started MultiBurst Pool " + name + " with " + tc + " threads at " + priority + " priority.");
+                        @Override
+                        public ForkJoinWorkerThread newThread(ForkJoinPool pool) {
+                            final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                            worker.setPriority(priority);
+                            worker.setName(name + " " + ++m);
+                            return worker;
+                        }
+                    },
+                    (t, e) -> e.printStackTrace(), true);
         }
 
         return service;
@@ -89,11 +76,39 @@ public class MultiBurst {
         burst(r.length).queue(r).complete();
     }
 
-    public void burst(KList<Runnable> r) {
+    public void burst(boolean multicore, Runnable... r) {
+        if (multicore) {
+            burst(r);
+        } else {
+            sync(r);
+        }
+    }
+
+    public void burst(List<Runnable> r) {
         burst(r.size()).queue(r).complete();
     }
 
+    public void burst(boolean multicore, List<Runnable> r) {
+        if (multicore) {
+            burst(r);
+        } else {
+            sync(r);
+        }
+    }
+
+    private void sync(List<Runnable> r) {
+        for (Runnable i : new KList<>(r)) {
+            i.run();
+        }
+    }
+
     public void sync(Runnable... r) {
+        for (Runnable i : r) {
+            i.run();
+        }
+    }
+
+    public void sync(KList<Runnable> r) {
         for (Runnable i : r) {
             i.run();
         }
@@ -105,6 +120,12 @@ public class MultiBurst {
 
     public BurstExecutor burst() {
         return burst(16);
+    }
+
+    public BurstExecutor burst(boolean multicore) {
+        BurstExecutor b = burst();
+        b.setMulticore(multicore);
+        return b;
     }
 
     public <T> Future<T> lazySubmit(Callable<T> o) {
@@ -119,46 +140,15 @@ public class MultiBurst {
         return getService().submit(o);
     }
 
-    public CompletableFuture<?> complete(Runnable o) {
-        return CompletableFuture.runAsync(o, getService());
+    public Future<?> complete(Runnable o) {
+        return getService().submit(o);
     }
 
-    public void shutdownNow() {
-        Iris.debug("Shutting down MultiBurst Pool " + heartbeat.getName() + ".");
-        heartbeat.interrupt();
-
-        if (service != null) {
-            service.shutdownNow().forEach(Runnable::run);
-        }
+    public <T> Future<T> completeValue(Callable<T> o) {
+        return getService().submit(o);
     }
 
-    public void shutdown() {
-        Iris.debug("Shutting down MultiBurst Pool " + heartbeat.getName() + ".");
-        heartbeat.interrupt();
-
-        if (service != null) {
-            service.shutdown();
-        }
-    }
-
-    public void shutdownLater() {
-        if (service != null) {
-            service.submit(() -> {
-                J.sleep(3000);
-                Iris.debug("Shutting down MultiBurst Pool " + heartbeat.getName() + ".");
-
-                if (service != null) {
-                    service.shutdown();
-                }
-            });
-
-            heartbeat.interrupt();
-        }
-    }
-
-    public void shutdownAndAwait() {
-        Iris.debug("Shutting down MultiBurst Pool " + heartbeat.getName() + ".");
-        heartbeat.interrupt();
+    public void close() {
         if (service != null) {
             service.shutdown();
             try {

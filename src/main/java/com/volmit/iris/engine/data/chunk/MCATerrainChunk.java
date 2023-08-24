@@ -18,6 +18,7 @@
 
 package com.volmit.iris.engine.data.chunk;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.nms.BiomeBaseInjector;
 import com.volmit.iris.util.nbt.mca.Chunk;
 import com.volmit.iris.util.nbt.mca.NBTWorld;
@@ -46,16 +47,9 @@ public class MCATerrainChunk implements TerrainChunk {
     }
 
     @Override
-    public void setRaw(ChunkGenerator.ChunkData data) {
-
-    }
-
-
-    @Override
     public Biome getBiome(int x, int z) {
         return Biome.THE_VOID;
     }
-
 
     @Override
     public Biome getBiome(int x, int y, int z) {
@@ -69,7 +63,7 @@ public class MCATerrainChunk implements TerrainChunk {
 
     @Override
     public void setBiome(int x, int y, int z, Biome bio) {
-        writer.setBiome(ox + x, y, oz + z, bio);
+        mcaChunk.setBiomeAt((ox + x) & 15, y, (oz + z) & 15, writer.getBiomeId(bio));
     }
 
     //@Override
@@ -91,9 +85,12 @@ public class MCATerrainChunk implements TerrainChunk {
             return;
         }
 
+        if (blockData == null) {
+            Iris.error("NULL BD");
+        }
+
         mcaChunk.setBlockStateAt(xx, y, zz, NBTWorld.getCompound(blockData), false);
     }
-
 
     @Override
     public org.bukkit.block.data.BlockData getBlockData(int x, int y, int z) {
@@ -111,6 +108,11 @@ public class MCATerrainChunk implements TerrainChunk {
     @Override
     public ChunkGenerator.ChunkData getRaw() {
         return null;
+    }
+
+    @Override
+    public void setRaw(ChunkGenerator.ChunkData data) {
+
     }
 
     @Override

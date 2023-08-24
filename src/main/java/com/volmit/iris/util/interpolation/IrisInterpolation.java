@@ -19,7 +19,7 @@
 package com.volmit.iris.util.interpolation;
 
 import com.google.common.util.concurrent.AtomicDouble;
-import com.volmit.iris.engine.object.noise.NoiseStyle;
+import com.volmit.iris.engine.object.NoiseStyle;
 import com.volmit.iris.util.function.NoiseProvider;
 import com.volmit.iris.util.function.NoiseProvider3;
 import com.volmit.iris.util.hunk.Hunk;
@@ -29,6 +29,8 @@ import com.volmit.iris.util.noise.CNG;
 import java.util.HashMap;
 
 public class IrisInterpolation {
+    public static CNG cng = NoiseStyle.SIMPLEX.create(new RNG());
+
     public static double bezier(double t) {
         return t * t * (3.0d - 2.0d * t);
     }
@@ -277,8 +279,6 @@ public class IrisInterpolation {
                 mux, a);
         //@done
     }
-
-    public static CNG cng = NoiseStyle.SIMPLEX.create(new RNG());
 
     public static double getBilinearNoise(int x, int z, double rad, NoiseProvider n) {
         int fx = (int) Math.floor(x / rad);

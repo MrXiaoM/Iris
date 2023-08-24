@@ -21,174 +21,119 @@ package com.volmit.iris.core.project;
 import com.google.gson.Gson;
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
-import com.volmit.iris.core.nms.INMS;
-import com.volmit.iris.core.project.loader.IrisData;
-import com.volmit.iris.core.project.loader.ResourceLoader;
-import com.volmit.iris.core.report.Report;
-import com.volmit.iris.core.report.ReportType;
-import com.volmit.iris.core.tools.IrisWorldCreator;
-import com.volmit.iris.engine.framework.Engine;
-import com.volmit.iris.engine.framework.IrisAccess;
-import com.volmit.iris.engine.object.biome.IrisBiome;
-import com.volmit.iris.engine.object.biome.IrisBiomeMutation;
-import com.volmit.iris.engine.object.biome.IrisBiomePaletteLayer;
-import com.volmit.iris.engine.object.block.IrisBlockData;
-import com.volmit.iris.engine.object.dimensional.IrisDimension;
-import com.volmit.iris.engine.object.entity.IrisEntity;
-import com.volmit.iris.engine.object.loot.IrisLootTable;
-import com.volmit.iris.engine.object.noise.IrisGenerator;
-import com.volmit.iris.engine.object.objects.IrisObjectPlacement;
-import com.volmit.iris.engine.object.regional.IrisRegion;
-import com.volmit.iris.engine.object.spawners.IrisSpawner;
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.core.loader.IrisRegistrant;
+import com.volmit.iris.core.loader.ResourceLoader;
+import com.volmit.iris.core.tools.IrisToolbelt;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisBlockData;
+import com.volmit.iris.engine.object.IrisDimension;
+import com.volmit.iris.engine.object.IrisEntity;
+import com.volmit.iris.engine.object.IrisGenerator;
+import com.volmit.iris.engine.object.IrisLootTable;
+import com.volmit.iris.engine.object.IrisObject;
+import com.volmit.iris.engine.object.IrisObjectPlacement;
+import com.volmit.iris.engine.object.IrisRegion;
+import com.volmit.iris.engine.object.IrisSpawner;
+import com.volmit.iris.engine.object.annotations.Snippet;
+import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.collection.KSet;
 import com.volmit.iris.util.exceptions.IrisException;
-import com.volmit.iris.util.format.C;
 import com.volmit.iris.util.format.Form;
 import com.volmit.iris.util.io.IO;
 import com.volmit.iris.util.json.JSONArray;
 import com.volmit.iris.util.json.JSONObject;
 import com.volmit.iris.util.math.M;
-import com.volmit.iris.util.parallel.MultiBurst;
 import com.volmit.iris.util.plugin.VolmitSender;
 import com.volmit.iris.util.scheduling.ChronoLatch;
 import com.volmit.iris.util.scheduling.J;
 import com.volmit.iris.util.scheduling.O;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
+import com.volmit.iris.util.scheduling.jobs.Job;
+import com.volmit.iris.util.scheduling.jobs.JobCollection;
+import com.volmit.iris.util.scheduling.jobs.ParallelQueueJob;
 import lombok.Data;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.World;
 import org.zeroturnaround.zip.ZipUtil;
 
-import java.awt.*;
+import java.awt.Desktop;
+import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @SuppressWarnings("ALL")
 @Data
 public class IrisProject {
     private File path;
     private String name;
-    private IrisAccess activeProvider;
+    private PlatformChunkGenerator activeProvider;
 
     public IrisProject(File path) {
         this.path = path;
         this.name = path.getName();
     }
 
-    public KList<Report> scanForErrors() {
-        KList<Report> reports = new KList<>();
-        IrisData data = new IrisData(path);
-        Gson g = new Gson();
-        MultiBurst.burst.burst(collectFiles("json").convert((i) -> () -> {
+    public static int clean(VolmitSender s, File clean) {
+        int c = 0;
+        if (clean.isDirectory()) {
+            for (File i : clean.listFiles()) {
+                c += clean(s, i);
+            }
+        } else if (clean.getName().endsWith(".json")) {
             try {
-                new JSONObject(IO.readAll(i));
+                clean(clean);
             } catch (Throwable e) {
-                synchronized (reports) {
-                    reports.add(Report.builder()
-                            .title("Invalid Json: " + i.getName())
-                            .message(i.getAbsolutePath() + e.getMessage())
-                            .suggestion("Correct the json")
-                            .type(ReportType.ERROR)
-                            .build());
-                }
+                Iris.reportError(e);
+                Iris.error("Failed to beautify " + clean.getAbsolutePath() + " You may have errors in your json!");
             }
-        }));
 
-        try {
-            if (activeProvider != null && activeProvider.getCompound() != null) {
-                for (int i = 0; i < getActiveProvider().getCompound().getSize(); i++) {
-                    Engine e = getActiveProvider().getCompound().getEngine(i);
-                    IrisDimension dim = e.getDimension();
-                    reports.add(scanForErrors(dim));
-                }
+            c++;
+        }
+
+        return c;
+    }
+
+    public static void clean(File clean) throws IOException {
+        JSONObject obj = new JSONObject(IO.readAll(clean));
+        fixBlocks(obj, clean);
+
+        IO.writeAll(clean, obj.toString(4));
+    }
+
+    public static void fixBlocks(JSONObject obj, File f) {
+        for (String i : obj.keySet()) {
+            Object o = obj.get(i);
+
+            if (i.equals("block") && o instanceof String && !o.toString().trim().isEmpty() && !o.toString().contains(":")) {
+                obj.put(i, "minecraft:" + o);
+                Iris.debug("Updated Block Key: " + o + " to " + obj.getString(i) + " in " + f.getPath());
             }
-        } catch (Throwable e) {
-            reports.add(Report.builder()
-                    .title("Failed to check all errors")
-                    .message("There may be some json errors, correct those first")
-                    .suggestion("Correct the json, or see exception below")
-                    .type(ReportType.SEVERE_WARNING)
-                    .build());
-            e.printStackTrace();
-        }
 
-        return reports;
+            if (o instanceof JSONObject) {
+                fixBlocks((JSONObject) o, f);
+            } else if (o instanceof JSONArray) {
+                fixBlocks((JSONArray) o, f);
+            }
+        }
     }
 
-    private KList<Report> scanForErrors(IrisDimension dim) {
-        KList<Report> reports = new KList<>();
+    public static void fixBlocks(JSONArray obj, File f) {
+        for (int i = 0; i < obj.length(); i++) {
+            Object o = obj.get(i);
 
-        if (dim.getFocus() != null && !dim.getFocus().isEmpty()) {
-            reports.add(Report.builder()
-                    .type(ReportType.NOTICE)
-                    .title("Focus Mode is Enabled")
-                    .message("Make sure to disable this before pushing")
-                    .suggestion("Turn off focus mode")
-                    .build());
+            if (o instanceof JSONObject) {
+                fixBlocks((JSONObject) o, f);
+            } else if (o instanceof JSONArray) {
+                fixBlocks((JSONArray) o, f);
+            }
         }
-
-        for (IrisRegion i : dim.getAllRegions(getActiveProvider())) {
-            scanForErrors(i);
-        }
-
-        return reports;
-    }
-
-    private KList<Report> scanForErrors(IrisRegion region) {
-        KList<Report> reports = new KList<>();
-
-        if (region.getRarity() > 60) {
-            reports.add(Report.builder()
-                    .type(ReportType.WARNING)
-                    .title("Region " + region.getName() + " has a rarity of " + region.getRarity())
-                    .message("The region rarity higher than 60 can cause performance issues")
-                    .suggestion("Scale all rarities down by 50% all at once, then repeat until all rarities are below 60")
-                    .build());
-        }
-
-        for (IrisBiome i : region.getAllBiomes(getActiveProvider())) {
-            reports.add(scanForErrors(i));
-        }
-
-        return reports;
-    }
-
-    private KList<Report> scanForErrors(IrisBiome biome) {
-        KList<Report> reports = new KList<>();
-
-        for (IrisObjectPlacement i : biome.getObjects()) {
-            reports.add(scanForErrors(biome, i));
-        }
-
-        for (IrisBiomePaletteLayer i : biome.getLayers()) {
-            reports.add(scanForErrors(biome, i));
-        }
-
-        for (IrisBiomePaletteLayer i : biome.getSeaLayers()) {
-            reports.add(scanForErrorsSeaLayers(biome, i));
-        }
-
-        return reports;
-    }
-
-    private KList<Report> scanForErrors(IrisBiome biome, IrisObjectPlacement i) {
-
-        return new KList<>();
-    }
-
-    private KList<Report> scanForErrors(IrisBiome biome, IrisBiomePaletteLayer i) {
-
-        return new KList<>();
-    }
-
-    private KList<Report> scanForErrorsSeaLayers(IrisBiome biome, IrisBiomePaletteLayer i) {
-
-        return new KList<>();
     }
 
     public boolean isOpen() {
@@ -214,63 +159,14 @@ public class IrisProject {
     }
 
     public void open(VolmitSender sender) throws IrisException {
-        open(sender, () ->
+        open(sender, 1337, (w) ->
         {
         });
     }
 
-    public void open(VolmitSender sender, Runnable onDone) throws IrisException {
-        if (isOpen()) {
-            close();
-        }
-
-        boolean hasError = false;
-
-        try {
-            KList<Report> reports = scanForErrors();
-
-            if (reports.isNotEmpty()) {
-                sender.sendMessage("There are " + reports.size() + " problems detected with this project. See console!");
-                Iris.error("===========================================================");
-                for (Report i : reports) {
-                    if (i.getType().equals(ReportType.ERROR)) {
-                        hasError = true;
-                    }
-
-                    switch (i.getType()) {
-                        case ERROR:
-                            Iris.error(i.toString());
-                            break;
-                        case SEVERE_WARNING:
-                            Iris.warn(i.toString());
-                            break;
-                        case WARNING:
-                            Iris.warn(i.toString());
-                            break;
-                        case NOTICE:
-                            Iris.warn(i.toString());
-                            break;
-                    }
-                }
-                Iris.error("===========================================================");
-            }
-        } catch (Throwable e) {
-            hasError = true;
-            e.printStackTrace();
-        }
-
-        if (hasError) {
-            return;
-        }
+    public void openVSCode(VolmitSender sender) {
 
         IrisDimension d = IrisData.loadAnyDimension(getName());
-        if (d == null) {
-            sender.sendMessage("Can't find dimension: " + getName());
-            return;
-        } else if (sender.isPlayer()) {
-            sender.player().setGameMode(GameMode.SPECTATOR);
-        }
-
         J.attemptAsync(() ->
         {
             try {
@@ -317,82 +213,55 @@ public class IrisProject {
                 e.printStackTrace();
             }
         });
+    }
 
-        String wfp = "iris/" + UUID.randomUUID();
+    public void open(VolmitSender sender, long seed, Consumer<World> onDone) throws IrisException {
+        if (isOpen()) {
+            close();
+        }
 
-        WorldCreator c = new IrisWorldCreator().dimension(getName())
-                .seed(1337)
-                .name(wfp)
-                .studioMode()
-                .create();
+        boolean hasError = false;
 
-        IrisAccess gx = ((IrisAccess) c.generator());
-        O<Boolean> done = new O<>();
-        done.set(false);
-        activeProvider = gx;
+        if (hasError) {
+            return;
+        }
 
-        J.a(() ->
-        {
-            double last = 0;
-            int req = 400;
+        IrisDimension d = IrisData.loadAnyDimension(getName());
+        if (d == null) {
+            sender.sendMessage("Can't find dimension: " + getName());
+            return;
+        } else if (sender.isPlayer()) {
+            sender.player().setGameMode(GameMode.SPECTATOR);
+        }
 
-            while (gx.getGenerated() < req) {
-                assert gx != null;
-                double v = (double) gx.getGenerated() / (double) req;
+        openVSCode(sender);
 
-                if (sender.isPlayer()) {
-                    sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - gx.getGenerated()) + " Left)"))));
-                    J.sleep(50);
-                } else {
-                    sender.sendMessage(C.WHITE + "Generating " + Form.pc(v) + ((C.GRAY + " (" + (req - gx.getGenerated()) + " Left)")));
-                    J.sleep(1000);
-                }
 
-                if (gx.isFailing()) {
-
-                    sender.sendMessage("Generation Failed!");
-                    break;
-                }
-            }
-            if (sender.isPlayer()) {
-                sender.player().spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(C.WHITE + "Generation Complete"));
+        J.a(() -> {
+            try {
+                activeProvider = (PlatformChunkGenerator) IrisToolbelt.createWorld()
+                        .seed(seed)
+                        .sender(sender)
+                        .studio(true)
+                        .name("iris/" + UUID.randomUUID())
+                        .dimension(d.getLoadKey())
+                        .create().getGenerator();
+                onDone.accept(activeProvider.getTarget().getWorld().realWorld());
+            } catch (IrisException e) {
+                e.printStackTrace();
             }
         });
-
-        //@builder
-        World world = INMS.get().createWorld(c);
-        if (IrisSettings.get().getStudio().isDisableTimeAndWeather()) {
-            world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
-            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-            world.setTime(6000);
-        }
-        Iris.linkMultiverseCore.removeFromConfig(world);
-
-        done.set(true);
-
-        if (sender.isPlayer()) {
-            assert world != null;
-            sender.player().teleport(world.getSpawnLocation());
-        } else {
-            sender.sendMessage(C.WHITE + "Generating Complete!");
-        }
-
-        Bukkit.getScheduler().scheduleSyncDelayedTask(Iris.instance, () ->
-        {
-            if (sender.isPlayer()) {
-                sender.player().setGameMode(GameMode.SPECTATOR);
-            }
-
-            onDone.run();
-        }, 0);
     }
 
     public void close() {
+        Iris.debug("Closing Active Provider");
+        IrisToolbelt.evacuate(activeProvider.getTarget().getWorld().realWorld());
         activeProvider.close();
         File folder = activeProvider.getTarget().getWorld().worldFolder();
         Iris.linkMultiverseCore.removeFromConfig(activeProvider.getTarget().getWorld().name());
         Bukkit.unloadWorld(activeProvider.getTarget().getWorld().name(), false);
         J.attemptAsync(() -> IO.delete(folder));
+        Iris.debug("Closed Active Provider " + activeProvider.getTarget().getWorld().name());
         activeProvider = null;
     }
 
@@ -406,11 +275,9 @@ public class IrisProject {
 
         try {
             PrecisionStopwatch p = PrecisionStopwatch.start();
-            Iris.info("Building Workspace: " + ws.getPath());
             JSONObject j = createCodeWorkspaceConfig();
             IO.writeAll(ws, j.toString(4));
             p.end();
-            Iris.info("Building Workspace: " + ws.getPath() + " took " + Form.duration(p.getMilliseconds(), 2));
             return true;
         } catch (Throwable e) {
             Iris.reportError(e);
@@ -458,11 +325,37 @@ public class IrisProject {
         settings.put("[json]", jc);
         settings.put("json.maxItemsComputed", 30000);
         JSONArray schemas = new JSONArray();
-        IrisData dm = new IrisData(getPath());
+        IrisData dm = IrisData.get(getPath());
 
         for (ResourceLoader<?> r : dm.getLoaders().v()) {
             if (r.supportsSchemas()) {
                 schemas.put(r.buildSchema());
+            }
+        }
+
+        for (Class<?> i : Iris.getClasses("com.volmit.iris.engine.object.", Snippet.class)) {
+            try {
+                String snipType = i.getDeclaredAnnotation(Snippet.class).value();
+                JSONObject o = new JSONObject();
+                KList<String> fm = new KList<>();
+
+                for (int g = 1; g < 8; g++) {
+                    fm.add("/snippet/" + snipType + Form.repeat("/*", g) + ".json");
+                }
+
+                o.put("fileMatch", new JSONArray(fm.toArray()));
+                o.put("url", "./.iris/schema/snippet/" + snipType + "-schema.json");
+                schemas.put(o);
+                File a = new File(dm.getDataFolder(), ".iris/schema/snippet/" + snipType + "-schema.json");
+                J.attemptAsync(() -> {
+                    try {
+                        IO.writeAll(a, new SchemaBuilder(i, dm).compute().toString(4));
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
+                });
+            } catch (Throwable e) {
+                e.printStackTrace();
             }
         }
 
@@ -474,7 +367,7 @@ public class IrisProject {
 
     public File compilePackage(VolmitSender sender, boolean obfuscate, boolean minify) {
         String dimm = getName();
-        IrisData dm = new IrisData(path);
+        IrisData dm = IrisData.get(path);
         IrisDimension dimension = dm.getDimensionLoader().load(dimm);
         File folder = new File(Iris.instance.getDataFolder(), "exports/" + dimension.getLoadKey());
         folder.mkdirs();
@@ -557,51 +450,12 @@ public class IrisProject {
             }
         }
 
-        for (IrisBiomeMutation i : dimension.getMutations()) {
-            for (IrisObjectPlacement j : i.getObjects()) {
-                b.append(j.hashCode());
-                KList<String> newNames = new KList<>();
-
-                for (String k : j.getPlace()) {
-                    if (renameObjects.containsKey(k)) {
-                        newNames.add(renameObjects.get(k));
-                        continue;
-                    }
-
-                    String name = !obfuscate ? k : UUID.randomUUID().toString().replaceAll("-", "");
-                    b.append(name);
-                    newNames.add(name);
-                    renameObjects.put(k, name);
-                }
-
-                j.setPlace(newNames);
-            }
-        }
-
         KMap<String, KList<String>> lookupObjects = renameObjects.flip();
         StringBuilder gb = new StringBuilder();
         ChronoLatch cl = new ChronoLatch(1000);
         O<Integer> ggg = new O<>();
         ggg.set(0);
         biomes.forEach((i) -> i.getObjects().forEach((j) -> j.getPlace().forEach((k) ->
-        {
-            try {
-                File f = dm.getObjectLoader().findFile(lookupObjects.get(k).get(0));
-                IO.copyFile(f, new File(folder, "objects/" + k + ".iob"));
-                gb.append(IO.hash(f));
-                ggg.set(ggg.get() + 1);
-
-                if (cl.flip()) {
-                    int g = ggg.get();
-                    ggg.set(0);
-                    sender.sendMessage("Wrote another " + g + " Objects");
-                }
-            } catch (Throwable e) {
-                Iris.reportError(e);
-            }
-        })));
-
-        dimension.getMutations().forEach((i) -> i.getObjects().forEach((j) -> j.getPlace().forEach((k) ->
         {
             try {
                 File f = dm.getObjectLoader().findFile(lookupObjects.get(k).get(0));
@@ -689,5 +543,146 @@ public class IrisProject {
         }
         sender.sendMessage("Failed!");
         return null;
+    }
+
+    public void compile(VolmitSender sender) {
+        IrisData data = IrisData.get(getPath());
+        KList<Job> jobs = new KList<Job>();
+        KList<File> files = new KList<File>();
+        KList<File> objects = new KList<File>();
+        files(getPath(), files);
+        filesObjects(getPath(), objects);
+
+        jobs.add(new ParallelQueueJob<File>() {
+            @Override
+            public void execute(File f) {
+                try {
+                    IrisObject o = new IrisObject(0, 0, 0);
+                    o.read(f);
+
+                    if (o.getBlocks().isEmpty()) {
+                        sender.sendMessageRaw("<hover:show_text:'Error:\n" +
+                                "<yellow>" + f.getPath() +
+                                "'><red>- IOB " + f.getName() + " has 0 blocks!");
+                    }
+
+                    if (o.getW() == 0 || o.getH() == 0 || o.getD() == 0) {
+                        sender.sendMessageRaw("<hover:show_text:'Error:\n" +
+                                "<yellow>" + f.getPath() + "\n<red>The width height or depth has a zero in it (bad format)" +
+                                "'><red>- IOB " + f.getName() + " is not 3D!");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public String getName() {
+                return "IOB";
+            }
+        }.queue(objects));
+
+        jobs.add(new ParallelQueueJob<File>() {
+            @Override
+            public void execute(File f) {
+                try {
+                    JSONObject p = new JSONObject(IO.readAll(f));
+                    fixBlocks(p);
+                    scanForErrors(data, f, p, sender);
+                    IO.writeAll(f, p.toString(4));
+
+                } catch (Throwable e) {
+                    sender.sendMessageRaw("<hover:show_text:'Error:\n" +
+                            "<yellow>" + f.getPath() +
+                            "\n<red>" + e.getMessage() +
+                            "'><red>- JSON Error " + f.getName());
+                }
+            }
+
+            @Override
+            public String getName() {
+                return "JSON";
+            }
+        }.queue(files));
+
+        new JobCollection("Compile", jobs).execute(sender);
+    }
+
+    private void scanForErrors(IrisData data, File f, JSONObject p, VolmitSender sender) {
+        String key = data.toLoadKey(f);
+        ResourceLoader<?> loader = data.getTypedLoaderFor(f);
+
+        if (loader == null) {
+            sender.sendMessageBasic("Can't find loader for " + f.getPath());
+            return;
+        }
+
+        IrisRegistrant load = loader.load(key);
+        compare(load.getClass(), p, sender, new KList<>());
+        load.scanForErrors(p, sender);
+    }
+
+    public void compare(Class<?> c, JSONObject j, VolmitSender sender, KList<String> path) {
+        try {
+            Object o = c.getClass().getConstructor().newInstance();
+        } catch (Throwable e) {
+
+        }
+    }
+
+    public void files(File clean, KList<File> files) {
+        if (clean.isDirectory()) {
+            for (File i : clean.listFiles()) {
+                files(i, files);
+            }
+        } else if (clean.getName().endsWith(".json")) {
+            try {
+                files.add(clean);
+            } catch (Throwable e) {
+                Iris.reportError(e);
+            }
+        }
+    }
+
+    public void filesObjects(File clean, KList<File> files) {
+        if (clean.isDirectory()) {
+            for (File i : clean.listFiles()) {
+                filesObjects(i, files);
+            }
+        } else if (clean.getName().endsWith(".iob")) {
+            try {
+                files.add(clean);
+            } catch (Throwable e) {
+                Iris.reportError(e);
+            }
+        }
+    }
+
+    private void fixBlocks(JSONObject obj) {
+        for (String i : obj.keySet()) {
+            Object o = obj.get(i);
+
+            if (i.equals("block") && o instanceof String && !o.toString().trim().isEmpty() && !o.toString().contains(":")) {
+                obj.put(i, "minecraft:" + o);
+            }
+
+            if (o instanceof JSONObject) {
+                fixBlocks((JSONObject) o);
+            } else if (o instanceof JSONArray) {
+                fixBlocks((JSONArray) o);
+            }
+        }
+    }
+
+    private void fixBlocks(JSONArray obj) {
+        for (int i = 0; i < obj.length(); i++) {
+            Object o = obj.get(i);
+
+            if (o instanceof JSONObject) {
+                fixBlocks((JSONObject) o);
+            } else if (o instanceof JSONArray) {
+                fixBlocks((JSONArray) o);
+            }
+        }
     }
 }

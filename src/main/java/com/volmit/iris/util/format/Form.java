@@ -24,25 +24,42 @@ import com.volmit.iris.util.math.RollingSequence;
 import java.math.BigInteger;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Form {
-    private static NumberFormat NF;
-    private static DecimalFormat DF;
-
     private static final String[] NAMES = new String[]{"Thousand", "Million", "Billion", "Trillion", "Quadrillion", "Quintillion", "Sextillion", "Septillion", "Octillion", "Nonillion", "Decillion", "Undecillion", "Duodecillion", "Tredecillion", "Quattuordecillion", "Quindecillion", "Sexdecillion", "Septendecillion", "Octodecillion", "Novemdecillion", "Vigintillion",};
     private static final BigInteger THOUSAND = BigInteger.valueOf(1000);
     private static final NavigableMap<BigInteger, String> MAP;
+    private static NumberFormat NF;
+    private static DecimalFormat DF;
 
     static {
         MAP = new TreeMap<>();
         for (int i = 0; i < NAMES.length; i++) {
             MAP.put(THOUSAND.pow(i + 1), NAMES[i]);
         }
+    }
+
+    public static String getNumberSuffixThStRd(int day) {
+        if (day >= 11 && day <= 13) {
+            return Form.f(day) + "th";
+        }
+        return switch (day % 10) {
+            case 1 -> Form.f(day) + "st";
+            case 2 -> Form.f(day) + "nd";
+            case 3 -> Form.f(day) + "rd";
+            default -> Form.f(day) + "th";
+        };
     }
 
     private static void instantiate() {
@@ -937,7 +954,7 @@ public class Form {
 
         DF = new DecimalFormat(form);
 
-        return DF.format(i);
+        return DF.format(i).replaceAll("\\Q,\\E", ".");
     }
 
     /**

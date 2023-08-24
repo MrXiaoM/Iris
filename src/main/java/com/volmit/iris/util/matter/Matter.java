@@ -18,17 +18,26 @@
 
 package com.volmit.iris.util.matter;
 
-import com.volmit.iris.engine.object.basic.IrisPosition;
+import com.volmit.iris.engine.object.IrisPosition;
+import com.volmit.iris.util.collection.KSet;
 import com.volmit.iris.util.data.Varint;
 import com.volmit.iris.util.hunk.Hunk;
 import com.volmit.iris.util.math.BlockPosition;
+import org.bukkit.World;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Entity;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * When Red Matter isn't enough
@@ -47,6 +56,51 @@ import java.util.zip.GZIPOutputStream;
  */
 public interface Matter {
     int VERSION = 1;
+
+    static Matter read(File f) throws IOException, ClassNotFoundException {
+        FileInputStream in = new FileInputStream(f);
+        Matter m = read(in);
+        in.close();
+        return m;
+    }
+
+    static Matter read(InputStream in) throws IOException, ClassNotFoundException {
+        return read(in, (b) -> new IrisMatter(b.getX(), b.getY(), b.getZ()));
+    }
+
+    /**
+     * Reads the input stream into a matter object using a matter factory.
+     * Does not close the input stream. Be a man, close it yourself.
+     *
+     * @param in            the input stream
+     * @param matterFactory the matter factory (size) -> new MatterImpl(size);
+     * @return the matter object
+     * @throws IOException shit happens yo
+     */
+    static Matter read(InputStream in, Function<BlockPosition, Matter> matterFactory) throws IOException, ClassNotFoundException {
+        DataInputStream din = new DataInputStream(in);
+        Matter matter = matterFactory.apply(new BlockPosition(
+                Varint.readUnsignedVarInt(din),
+                Varint.readUnsignedVarInt(din),
+                Varint.readUnsignedVarInt(din)));
+        int sliceCount = din.readByte();
+        matter.getHeader().read(din);
+
+        while (sliceCount-- > 0) {
+            String cn = din.readUTF();
+            try {
+                Class<?> type = Class.forName(cn);
+                MatterSlice<?> slice = matter.createSlice(type, matter);
+                slice.read(din);
+                matter.putSlice(type, slice);
+            } catch (Throwable e) {
+                e.printStackTrace();
+                throw new IOException("Can't read class '" + cn + "' (slice count reverse at " + sliceCount + ")");
+            }
+        }
+
+        return matter;
+    }
 
     /**
      * Get the header information
@@ -86,7 +140,7 @@ public interface Matter {
     }
 
     /**
-     * Create a slice from the given type
+     * Create a slice from the given type (full is false)
      *
      * @param type   the type class
      * @param matter the matter this slice will go into (size provider)
@@ -165,36 +219,56 @@ public interface Matter {
         return (MatterSlice<T>) getSliceMap().put(c, slice);
     }
 
-    default <T> MatterSlice<T> slice(Class<?> c) {
-        if (!hasSlice(c)) {
-            MatterSlice<?> s = createSlice(c, this);
+    default Class<?> getClass(Object w) {
+        Class<?> c = w.getClass();
 
-            if (s == null) {
+        if (w instanceof World) {
+            c = World.class;
+        } else if (w instanceof BlockData) {
+            c = BlockData.class;
+        } else if (w instanceof Entity) {
+            c = Entity.class;
+        }
+
+        return c;
+    }
+
+    default <T> MatterSlice<T> slice(Class<?> c) {
+        MatterSlice<T> slice = (MatterSlice<T>) getSlice(c);
+        if (slice == null) {
+            slice = (MatterSlice<T>) createSlice(c, this);
+
+            if (slice == null) {
+                try {
+                    throw new RuntimeException("Bad slice " + c.getCanonicalName());
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+
                 return null;
             }
 
-            putSlice(c, (MatterSlice<T>) s);
+            putSlice(c, slice);
         }
 
-        return (MatterSlice<T>) getSlice(c);
+        return slice;
     }
 
     /**
      * Rotate a matter object into a new object
+     *
      * @param x the x rotation (degrees)
      * @param y the y rotation (degrees)
      * @param z the z rotation (degrees)
      * @return the new rotated matter object
      */
-    default Matter rotate(double x, double y, double z)
-    {
+    default Matter rotate(double x, double y, double z) {
         IrisPosition rs = Hunk.rotatedBounding(getWidth(), getHeight(), getDepth(), x, y, z);
         Matter n = new IrisMatter(rs.getX(), rs.getY(), rs.getZ());
         n.getHeader().setAuthor(getHeader().getAuthor());
         n.getHeader().setCreatedAt(getHeader().getCreatedAt());
 
-        for(Class<?> i : getSliceTypes())
-        {
+        for (Class<?> i : getSliceTypes()) {
             getSlice(i).rotateSliceInto(n, x, y, z);
         }
 
@@ -234,12 +308,37 @@ public interface Matter {
      */
     Map<Class<?>, MatterSlice<?>> getSliceMap();
 
-    default void write(File f) throws IOException
-    {
-        FileOutputStream out = new FileOutputStream(f);
-        GZIPOutputStream gzo = new GZIPOutputStream(out);
-        write(gzo);
-        gzo.close();
+    default void write(File f) throws IOException {
+        write(f, true);
+    }
+
+    default void write(File f, boolean compression) throws IOException {
+        OutputStream out = new FileOutputStream(f);
+        write(out);
+        out.close();
+    }
+
+    /**
+     * Remove any slices that are empty
+     */
+    default void trimSlices() {
+        Set<Class<?>> drop = null;
+
+        for (Class<?> i : getSliceTypes()) {
+            if (getSlice(i).getEntryCount() == 0) {
+                if (drop == null) {
+                    drop = new KSet<>();
+                }
+
+                drop.add(i);
+            }
+        }
+
+        if (drop != null) {
+            for (Class<?> i : drop) {
+                deleteSlice(i);
+            }
+        }
     }
 
     /**
@@ -250,61 +349,29 @@ public interface Matter {
      * @throws IOException shit happens yo
      */
     default void write(OutputStream out) throws IOException {
-        DataOutputStream dos = new DataOutputStream(out);
-        // Write size
+        writeDos(new DataOutputStream(out));
+    }
+
+    default void writeDos(DataOutputStream dos) throws IOException {
+        trimSlices();
         Varint.writeUnsignedVarInt(getWidth(), dos);
         Varint.writeUnsignedVarInt(getHeight(), dos);
         Varint.writeUnsignedVarInt(getDepth(), dos);
-        dos.writeByte(getSliceTypes().size() + Byte.MIN_VALUE);
+        dos.writeByte(getSliceTypes().size());
         getHeader().write(dos);
 
         for (Class<?> i : getSliceTypes()) {
             getSlice(i).write(dos);
         }
-
-        dos.flush();
     }
 
-    static Matter read(File f) throws IOException, ClassNotFoundException
-    {
-        FileInputStream in = new FileInputStream(f);
-        GZIPInputStream gzi = new GZIPInputStream(in);
-        Matter m = read(gzi);
-        gzi.close();
-        return m;
-    }
+    default int getTotalCount() {
+        int m = 0;
 
-    static Matter read(InputStream in) throws IOException, ClassNotFoundException
-    {
-        return read(in, (b) -> new IrisMatter(b.getX(), b.getY(), b.getZ()));
-    }
-
-    /**
-     * Reads the input stream into a matter object using a matter factory.
-     * Does not close the input stream. Be a man, close it yourself.
-     *
-     * @param in            the input stream
-     * @param matterFactory the matter factory (size) -> new MatterImpl(size);
-     * @return the matter object
-     * @throws IOException shit happens yo
-     */
-    static Matter read(InputStream in, Function<BlockPosition, Matter> matterFactory) throws IOException, ClassNotFoundException {
-        DataInputStream din = new DataInputStream(in);
-        // Read size into new matter object
-        Matter matter = matterFactory.apply(new BlockPosition(
-                Varint.readUnsignedVarInt(din),
-                Varint.readUnsignedVarInt(din),
-                Varint.readUnsignedVarInt(din)));
-        int sliceCount = din.readByte() - Byte.MIN_VALUE;
-        matter.getHeader().read(din);
-
-        while (sliceCount-- > 0) {
-            Class<?> type = Class.forName(din.readUTF());
-            MatterSlice<?> slice = matter.createSlice(type, matter);
-            slice.read(din);
-            matter.putSlice(type, slice);
+        for (MatterSlice<?> i : getSliceMap().values()) {
+            m += i.getEntryCount();
         }
 
-        return matter;
+        return m;
     }
 }

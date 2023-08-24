@@ -142,6 +142,24 @@ public enum ParticleType {
         this.minimumVersion = minimumVersion;
     }
 
+    public static ParticleType getParticle(String particleName) {
+        try {
+            return ParticleType.valueOf(particleName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            Iris.reportError(e);
+            for (ParticleType particle : values()) {
+                if (particle.getName().equalsIgnoreCase(particleName)) {
+                    return particle;
+                }
+
+                if (particle.hasLegacyName() && particle.getLegacyName().equalsIgnoreCase(particleName)) {
+                    return particle;
+                }
+            }
+        }
+        return null;
+    }
+
     public boolean hasLegacyName() {
         return legacyName != null;
     }
@@ -173,23 +191,5 @@ public enum ParticleType {
                 return Color.class;
         }
         return Void.class;
-    }
-
-    public static ParticleType getParticle(String particleName) {
-        try {
-            return ParticleType.valueOf(particleName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            Iris.reportError(e);
-            for (ParticleType particle : values()) {
-                if (particle.getName().equalsIgnoreCase(particleName)) {
-                    return particle;
-                }
-
-                if (particle.hasLegacyName() && particle.getLegacyName().equalsIgnoreCase(particleName)) {
-                    return particle;
-                }
-            }
-        }
-        return null;
     }
 }

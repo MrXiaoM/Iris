@@ -18,13 +18,14 @@
 
 package com.volmit.iris.util.hunk.storage;
 
-import com.volmit.iris.Iris;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4IO;
 import com.volmit.iris.util.hunk.Hunk;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.io.IOException;
 import java.util.Map;
 
 @SuppressWarnings({"DefaultAnnotationParam", "Lombok"})
@@ -40,6 +41,14 @@ public class MappedHunk<T> extends StorageHunk<T> implements Hunk<T> {
 
     public int getEntryCount() {
         return data.size();
+    }
+
+    public boolean isMapped() {
+        return true;
+    }
+
+    public boolean isEmpty() {
+        return data.isEmpty();
     }
 
     @Override
@@ -58,6 +67,20 @@ public class MappedHunk<T> extends StorageHunk<T> implements Hunk<T> {
 
     @Override
     public synchronized Hunk<T> iterateSync(Consumer4<Integer, Integer, Integer, T> c) {
+        int idx, z;
+
+        for (Map.Entry<Integer, T> g : data.entrySet()) {
+            idx = g.getKey();
+            z = idx / (getWidth() * getHeight());
+            idx -= (z * getWidth() * getHeight());
+            c.accept(idx % getWidth(), idx / getWidth(), z, g.getValue());
+        }
+
+        return this;
+    }
+
+    @Override
+    public synchronized Hunk<T> iterateSyncIO(Consumer4IO<Integer, Integer, Integer, T> c) throws IOException {
         int idx, z;
 
         for (Map.Entry<Integer, T> g : data.entrySet()) {

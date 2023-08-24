@@ -189,7 +189,7 @@ public class ProjectManager {
     }
 
     public void download(VolmitSender sender, String repo, String branch, boolean trim, boolean forceOverwrite) throws JsonSyntaxException, IOException {
-        String url = "https://ghproxy.com//https://github.com/" + repo + "/archive/refs/heads/" + branch;
+        String url = "https://ghproxy.com//https://github.com/" + repo + "/archive/refs/heads/" + branch + ".zip";
         sender.sendMessage("Downloading " + url);
         File zip = Iris.getNonCachedFile("pack-" + trim + "-" + repo, url);
         File temp = Iris.getTemp();

@@ -28,6 +28,7 @@ val apiVersion = "1.16"
 val mcVersion = "1.16.5"
 val mcSubVersion = "R0.1"
 val main = "com.volmit.iris.Iris"
+val javaVer = "11"
 
 allprojects {
     apply(plugin = "java")
@@ -59,6 +60,18 @@ allprojects {
     }
     dependencies {
         implementation("org.spigotmc:spigot-api:$mcVersion-$mcSubVersion-SNAPSHOT")
+    }
+    java {
+        val javaVersion = JavaVersion.toVersion(javaVer)
+        sourceCompatibility = javaVersion
+        targetCompatibility = javaVersion
+    }
+    tasks {
+        withType<JavaCompile>().configureEach {
+            sourceCompatibility = javaVer
+            targetCompatibility = javaVer
+            options.encoding = "UTF-8"
+        }
     }
 }
 

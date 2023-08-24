@@ -95,8 +95,8 @@ file(jar.archiveFile.get().getAsFile().getParentFile().getParentFile().getParent
 processResources {
     filesMatching("**/plugin.yml") {
         expand(
-                "name": name.toString(),
-                "version": version.toString(),
+                "name": project.name.toString(),
+                "version": project.version.toString(),
                 "main": main.toString(),
                 "apiversion": apiVersion.toString()
         )
@@ -115,17 +115,16 @@ repositories {
     }
 }
 
-shadowJar
-        {
-            append("plugin.yml")
-            minimize()
-            relocate "com.dfsek.paralithic", "com.volmit.iris.util.paralithic"
-            relocate "io.papermc.lib", "com.volmit.iris.util.paper"
-            dependencies {
-                include(dependency("io.papermc:paperlib:1.0.5"))
-                include(dependency("com.dfsek:Paralithic:0.4.0"))
-            }
-        }
+shadowJar {
+    append("plugin.yml")
+    minimize()
+    relocate "com.dfsek.paralithic", "com.volmit.iris.util.paralithic"
+    relocate "io.papermc.lib", "com.volmit.iris.util.paper"
+    dependencies {
+        include(dependency("io.papermc:paperlib:1.0.5"))
+        include(dependency("com.dfsek:Paralithic:0.4.0"))
+    }
+}
 
 manifest()
 

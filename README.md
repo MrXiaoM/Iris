@@ -1,8 +1,13 @@
 # Iris
 
-For 1.16 and below, see the 1.14-1.16 branch. The master branch is for the latest version of minecraft.
+The fork is only for Minecraft `1.16.5`.  
+Based on `iris-1.8.7`.
 
-# [Support](https://discord.gg/3xxPTpT) **|** [Documentation](https://docs.volmit.com/iris/) **|** [Git](https://github.com/IrisDimensions)
+MythicMobs 4.x supported.
+
+# [Documentation](https://docs.volmit.com/iris/) **|** [Dumension Packs](https://github.com/IrisDimensions)
+
+Default `overworld` pack for this fork is now available in [releases](https://github.com/MrXiaoM/Iris/releases/tag/overworld).
 
 ## Iris Toolbelt
 

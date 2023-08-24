@@ -1,3 +1,5 @@
+![iris](wad.png)
+
 # Iris
 
 The fork is only for Minecraft `1.16.5`.  
@@ -5,7 +7,7 @@ Based on `iris-1.8.7`.
 
 MythicMobs 4.x supported.
 
-# [Documentation](https://docs.volmit.com/iris/) **|** [Dumension Packs](https://github.com/IrisDimensions)
+# [Documentation](https://docs.volmit.com/iris/) **|** [Dimension Packs](https://github.com/IrisDimensions)
 
 Default `overworld` pack for this fork is now available in [releases](https://github.com/MrXiaoM/Iris/releases/tag/overworld).
 

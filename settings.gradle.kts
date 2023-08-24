@@ -16,6 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-rootProject.name = 'Iris'
-include 'api'
+rootProject.name = "Iris"
+include("api")
 

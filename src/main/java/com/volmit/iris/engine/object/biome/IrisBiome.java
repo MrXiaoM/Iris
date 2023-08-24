@@ -633,7 +633,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
     public Color getColor(Engine engine, RenderType type) {
         switch (type) {
-            case BIOME, HEIGHT, CAVE_LAND, REGION, BIOME_SEA, BIOME_LAND -> {
+            case BIOME: case HEIGHT: case CAVE_LAND: case REGION: case BIOME_SEA: case BIOME_LAND: {
                 return this.cacheColor.aquire(() -> {
                     if (this.color == null) {
                         RandomColor randomColor = new RandomColor(getName().hashCode());
@@ -657,7 +657,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     }
                 });
             }
-            case OBJECT_LOAD -> {
+            case OBJECT_LOAD: {
                 return cacheColorObjectDensity.aquire(() -> {
                     double density = 0;
 
@@ -668,7 +668,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     return Color.getHSBColor(0.225f, (float) (density / engine.getMaxBiomeObjectDensity()), 1f);
                 });
             }
-            case DECORATOR_LOAD -> {
+            case DECORATOR_LOAD: {
                 return cacheColorDecoratorLoad.aquire(() -> {
                     double density = 0;
 
@@ -679,7 +679,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     return Color.getHSBColor(0.41f, (float) (density / engine.getMaxBiomeDecoratorDensity()), 1f);
                 });
             }
-            case LAYER_LOAD -> {
+            case LAYER_LOAD: {
                 return cacheColorLayerLoad.aquire(() -> Color.getHSBColor(0.625f, (float) (getLayers().size() / engine.getMaxBiomeLayerDensity()), 1f));
             }
         }

@@ -159,7 +159,7 @@ public class EngineCompositeGenerator extends ChunkGenerator implements IrisAcce
                 try {
                     for (Player i : getTarget().getWorld().getPlayers()) {
                         new VolmitSender(i, Iris.instance.getTag()).sendMessage("Dimension Hotloaded");
-                        i.playSound(i.getLocation(), Sound.BLOCK_COPPER_PLACE, 1f, 1.25f);
+                        i.playSound(i.getLocation(), Sound.BLOCK_GRASS_PLACE, 1f, 1.25f);
                     }
                 } catch (Throwable e) {
                     Iris.reportError(e);

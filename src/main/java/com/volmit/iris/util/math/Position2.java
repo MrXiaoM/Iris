@@ -67,9 +67,10 @@ public class Position2 {
         if (this == obj) {
             return true;
         }
-        if (!(obj instanceof Position2 other)) {
+        if (!(obj instanceof Position2)) {
             return false;
         }
+        Position2 other = (Position2) obj;
         return x == other.x && z == other.z;
     }
 

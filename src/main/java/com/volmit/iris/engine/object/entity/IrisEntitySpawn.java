@@ -83,9 +83,12 @@ public class IrisEntitySpawn implements IRare {
                 int z = (c.getZ() * 16) + rng.i(15);
                 int h = gen.getHeight(x, z, true);
                 int hf = gen.getHeight(x, z, false);
-                Location l = switch (getReferenceSpawner().getGroup()) {
-                    case NORMAL -> new Location(c.getWorld(), x, hf + 1, z);
-                    case CAVE -> {
+                Location l = null;
+                switch (getReferenceSpawner().getGroup()) {
+                    case NORMAL:
+                        l = new Location(c.getWorld(), x, hf + 1, z);
+                        break;
+                    case CAVE: {
                         IrisComplex comp = gen.getFramework().getComplex();
                         EngineFramework frame = gen.getFramework();
                         IrisBiome cave = comp.getCaveBiomeStream().get(x, z);
@@ -100,11 +103,15 @@ public class IrisEntitySpawn implements IRare {
                             }
                         }
 
-                        yield r.getRandom(rng);
+                        l = r.getRandom(rng);
+                        break;
                     }
 
-                    case UNDERWATER, BEACH -> new Location(c.getWorld(), x, rng.i(h + 1, hf), z);
-                };
+                    case UNDERWATER:
+                    case BEACH:
+                        l = new Location(c.getWorld(), x, rng.i(h + 1, hf), z);
+                        break;
+                }
 
                 if (l != null) {
                     if (spawn100(gen, l) != null)

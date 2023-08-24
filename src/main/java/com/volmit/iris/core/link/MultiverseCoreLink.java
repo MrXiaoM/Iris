@@ -132,12 +132,11 @@ public class MultiverseCoreLink {
             return "normal";
         }
 
-        return switch (environment) {
-            case NORMAL -> "normal";
-            case NETHER -> "nether";
-            case THE_END -> "end";
-            default -> environment.toString().toLowerCase();
+        switch (environment) {
+            case NORMAL: return "normal";
+            case NETHER: return "nether";
+            case THE_END: return  "end";
         };
-
+        return environment.name().toLowerCase();
     }
 }

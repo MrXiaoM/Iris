@@ -186,7 +186,15 @@ public class XMLTokener extends JSONTokener {
                         return Boolean.TRUE;
                     }
                     switch (c) {
-                        case 0, '<', '>', '/', '=', '!', '?', '"', '\'' -> {
+                        case 0:
+                        case '<':
+                        case '>':
+                        case '/':
+                        case '=':
+                        case '!':
+                        case '?':
+                        case '"':
+                        case '\'': {
                             back();
                             return Boolean.TRUE;
                         }

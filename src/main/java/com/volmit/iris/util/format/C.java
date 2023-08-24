@@ -551,43 +551,45 @@ public enum C {
     }
 
     public byte getMeta() {
-        return switch (this) {
-            case AQUA -> (byte) 11;
-            case BLACK -> (byte) 0;
-            case BLUE, DARK_AQUA -> (byte) 9;
-            case BOLD, UNDERLINE, STRIKETHROUGH, RESET, MAGIC, ITALIC -> (byte) -1;
-            case DARK_BLUE -> (byte) 1;
-            case DARK_GRAY -> (byte) 8;
-            case DARK_GREEN -> (byte) 2;
-            case DARK_PURPLE -> (byte) 5;
-            case DARK_RED -> (byte) 4;
-            case GOLD -> (byte) 6;
-            case GRAY -> (byte) 7;
-            case GREEN -> (byte) 10;
-            case LIGHT_PURPLE -> (byte) 13;
-            case RED -> (byte) 12;
-            case WHITE -> (byte) 15;
-            case YELLOW -> (byte) 14;
-        };
+        switch (this) {
+            case AQUA: return (byte) 11;
+            case BLACK: return (byte) 0;
+            case BLUE: case DARK_AQUA: return (byte) 9;
+            case BOLD: case UNDERLINE: case STRIKETHROUGH: case RESET: case MAGIC: case ITALIC: return (byte) -1;
+            case DARK_BLUE: return (byte) 1;
+            case DARK_GRAY: return (byte) 8;
+            case DARK_GREEN: return (byte) 2;
+            case DARK_PURPLE: return (byte) 5;
+            case DARK_RED: return (byte) 4;
+            case GOLD: return (byte) 6;
+            case GRAY: return (byte) 7;
+            case GREEN: return (byte) 10;
+            case LIGHT_PURPLE: return (byte) 13;
+            case RED: return (byte) 12;
+            case WHITE: return (byte) 15;
+            case YELLOW: return (byte) 14;
+        }
+        return (byte) 15;
     }
 
     public byte getItemMeta() {
-        return switch (this) {
-            case AQUA, DARK_AQUA -> (byte) 9;
-            case BLACK -> (byte) 15;
-            case BLUE -> (byte) 3;
-            case BOLD, UNDERLINE, RESET, STRIKETHROUGH, MAGIC, ITALIC -> (byte) -1;
-            case DARK_BLUE -> (byte) 11;
-            case DARK_GRAY -> (byte) 7;
-            case DARK_GREEN -> (byte) 13;
-            case DARK_PURPLE -> (byte) 10;
-            case DARK_RED, RED -> (byte) 14;
-            case GOLD, YELLOW -> (byte) 4;
-            case GRAY -> (byte) 8;
-            case GREEN -> (byte) 5;
-            case LIGHT_PURPLE -> (byte) 2;
-            case WHITE -> (byte) 0;
-        };
+        switch (this) {
+            case AQUA: case DARK_AQUA: return (byte) 9;
+            case BLACK: return (byte) 15;
+            case BLUE: return (byte) 3;
+            case BOLD: case UNDERLINE: case RESET: case STRIKETHROUGH: case MAGIC: case ITALIC: return (byte) -1;
+            case DARK_BLUE: return (byte) 11;
+            case DARK_GRAY: return (byte) 7;
+            case DARK_GREEN: return (byte) 13;
+            case DARK_PURPLE: return (byte) 10;
+            case DARK_RED: case RED: return (byte) 14;
+            case GOLD: case YELLOW: return (byte) 4;
+            case GRAY: return (byte) 8;
+            case GREEN: return (byte) 5;
+            case LIGHT_PURPLE: return (byte) 2;
+            case WHITE: return (byte) 0;
+        }
+        return (byte) 0;
     }
 
     public static C randomColor() {

@@ -178,8 +178,8 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
         accuracy = down ? accuracy * 4 : accuracy;
         int v = 1000;
 
-        if (g instanceof Graphics2D gg) {
-
+        if (g instanceof Graphics2D) {
+            Graphics2D gg = (Graphics2D) g;
             if (getParent().getWidth() != w || getParent().getHeight() != h) {
                 w = getParent().getWidth();
                 h = getParent().getHeight();

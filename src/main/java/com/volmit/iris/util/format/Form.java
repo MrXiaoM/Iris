@@ -342,33 +342,71 @@ public class Form {
                 } else {
                     int h = c.get(Calendar.HOUR);
                     h = h == 0 ? 12 : h;
-                    String dow = switch (c.get(Calendar.DAY_OF_WEEK)) {
-                        case Calendar.SUNDAY -> "Sunday";
-                        case Calendar.MONDAY -> "Monday";
-                        case Calendar.TUESDAY -> "Tuesday";
-                        case Calendar.WEDNESDAY -> "Wednesday";
-                        case Calendar.THURSDAY -> "Thursday";
-                        case Calendar.FRIDAY -> "Friday";
-                        case Calendar.SATURDAY -> "Saturday";
-                        default -> "Error Day";
-                    };
+                    String dow = "Error Day";
+                    switch (c.get(Calendar.DAY_OF_WEEK)) {
+                        case Calendar.SUNDAY:
+                            dow = "Sunday";
+                            break;
+                        case Calendar.MONDAY:
+                            dow = "Monday";
+                            break;
+                        case Calendar.TUESDAY:
+                            dow = "Tuesday";
+                            break;
+                        case Calendar.WEDNESDAY:
+                            dow = "Wednesday";
+                            break;
+                        case Calendar.THURSDAY:
+                            dow = "Thursday";
+                            break;
+                        case Calendar.FRIDAY:
+                            dow = "Friday";
+                            break;
+                        case Calendar.SATURDAY:
+                            dow = "Saturday";
+                            break;
+                    }
 
                     String monthName = "Error Month";
                     int month = c.get(Calendar.MONTH);
 
                     switch (month) {
-                        case Calendar.JANUARY -> monthName = "Jan";
-                        case Calendar.FEBRUARY -> monthName = "Feb";
-                        case Calendar.MARCH -> monthName = "Mar";
-                        case Calendar.APRIL -> monthName = "Apr";
-                        case Calendar.MAY -> monthName = "May";
-                        case Calendar.JUNE -> monthName = "Jun";
-                        case Calendar.JULY -> monthName = "Jul";
-                        case Calendar.AUGUST -> monthName = "Aug";
-                        case Calendar.SEPTEMBER -> monthName = "Sep";
-                        case Calendar.OCTOBER -> monthName = "Oct";
-                        case Calendar.NOVEMBER -> monthName = "Nov";
-                        case Calendar.DECEMBER -> monthName = "Dec";
+                        case Calendar.JANUARY:
+                            monthName = "Jan";
+                            break;
+                        case Calendar.FEBRUARY:
+                            monthName = "Feb";
+                            break;
+                        case Calendar.MARCH:
+                            monthName = "Mar";
+                            break;
+                        case Calendar.APRIL:
+                            monthName = "Apr";
+                            break;
+                        case Calendar.MAY:
+                            monthName = "May";
+                            break;
+                        case Calendar.JUNE:
+                            monthName = "Jun";
+                            break;
+                        case Calendar.JULY:
+                            monthName = "Jul";
+                            break;
+                        case Calendar.AUGUST:
+                            monthName = "Aug";
+                            break;
+                        case Calendar.SEPTEMBER:
+                            monthName = "Sep";
+                            break;
+                        case Calendar.OCTOBER:
+                            monthName = "Oct";
+                            break;
+                        case Calendar.NOVEMBER:
+                            monthName = "Nov";
+                            break;
+                        case Calendar.DECEMBER:
+                            monthName = "Dec";
+                            break;
                     }
 
                     int dayOfMonth = c.get(Calendar.DAY_OF_MONTH);
@@ -379,34 +417,73 @@ public class Form {
             } else {
                 int h = c.get(Calendar.HOUR);
                 h = h == 0 ? 12 : h;
-                String dow = switch (c.get(Calendar.DAY_OF_WEEK)) {
-                    case Calendar.SUNDAY -> "Sunday";
-                    case Calendar.MONDAY -> "Monday";
-                    case Calendar.TUESDAY -> "Tuesday";
-                    case Calendar.WEDNESDAY -> "Wednesday";
-                    case Calendar.THURSDAY -> "Thursday";
-                    case Calendar.FRIDAY -> "Friday";
-                    case Calendar.SATURDAY -> "Saturday";
-                    default -> "Error Day";
-                };
+                String dow = "Error Day";
+                switch (c.get(Calendar.DAY_OF_WEEK)) {
+                    case Calendar.SUNDAY:
+                        dow = "Sunday";
+                        break;
+                    case Calendar.MONDAY:
+                        dow = "Monday";
+                        break;
+                    case Calendar.TUESDAY:
+                        dow = "Tuesday";
+                        break;
+                    case Calendar.WEDNESDAY:
+                        dow = "Wednesday";
+                        break;
+                    case Calendar.THURSDAY:
+                        dow = "Thursday";
+                        break;
+                    case Calendar.FRIDAY:
+                        dow = "Friday";
+                        break;
+                    case Calendar.SATURDAY:
+                        dow = "Saturday";
+                        break;
+                }
 
                 String monthName = "Error Month";
                 int month = c.get(Calendar.MONTH);
 
                 switch (month) {
-                    case Calendar.JANUARY -> monthName = "Jan";
-                    case Calendar.FEBRUARY -> monthName = "Feb";
-                    case Calendar.MARCH -> monthName = "Mar";
-                    case Calendar.APRIL -> monthName = "Apr";
-                    case Calendar.MAY -> monthName = "May";
-                    case Calendar.JUNE -> monthName = "Jun";
-                    case Calendar.JULY -> monthName = "Jul";
-                    case Calendar.AUGUST -> monthName = "Aug";
-                    case Calendar.SEPTEMBER -> monthName = "Sep";
-                    case Calendar.OCTOBER -> monthName = "Oct";
-                    case Calendar.NOVEMBER -> monthName = "Nov";
-                    case Calendar.DECEMBER -> monthName = "Dec";
+                    case Calendar.JANUARY:
+                        monthName = "Jan";
+                        break;
+                    case Calendar.FEBRUARY:
+                        monthName = "Feb";
+                        break;
+                    case Calendar.MARCH:
+                        monthName = "Mar";
+                        break;
+                    case Calendar.APRIL:
+                        monthName = "Apr";
+                        break;
+                    case Calendar.MAY:
+                        monthName = "May";
+                        break;
+                    case Calendar.JUNE:
+                        monthName = "Jun";
+                        break;
+                    case Calendar.JULY:
+                        monthName = "Jul";
+                        break;
+                    case Calendar.AUGUST:
+                        monthName = "Aug";
+                        break;
+                    case Calendar.SEPTEMBER:
+                        monthName = "Sep";
+                        break;
+                    case Calendar.OCTOBER:
+                        monthName = "Oct";
+                        break;
+                    case Calendar.NOVEMBER:
+                        monthName = "Nov";
+                        break;
+                    case Calendar.DECEMBER:
+                        monthName = "Dec";
+                        break;
                 }
+
 
                 int dayOfMonth = c.get(Calendar.DAY_OF_MONTH);
                 String suffix = numberSuffix(dayOfMonth);
@@ -424,11 +501,10 @@ public class Form {
      * @return the suffix
      */
     public static String numberSuffix(int i) {
-        String[] sufixes = new String[]{"th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"};
-        return switch (i % 100) {
-            case 11, 12, 13 -> i + "th";
-            default -> i + sufixes[i % 10];
-        };
+        String[] suffixes = new String[]{"th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"};
+        int j = i % 100;
+        if (j == 11 || j == 12 || j == 13) return i + "th";
+        else return i + suffixes[i % 10];
     }
 
     /**

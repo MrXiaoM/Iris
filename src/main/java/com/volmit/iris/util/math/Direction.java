@@ -49,28 +49,53 @@ public enum Direction {
     private final CuboidDirection f;
 
     public static Direction getDirection(BlockFace f) {
-        return switch (f) {
-            case DOWN -> D;
-            case EAST, EAST_SOUTH_EAST, EAST_NORTH_EAST -> E;
-            case NORTH, NORTH_WEST, NORTH_NORTH_WEST, NORTH_NORTH_EAST, NORTH_EAST -> N;
-            case SELF, UP -> U;
-            case SOUTH, SOUTH_WEST, SOUTH_SOUTH_WEST, SOUTH_SOUTH_EAST, SOUTH_EAST -> S;
-            case WEST, WEST_SOUTH_WEST, WEST_NORTH_WEST -> W;
-        };
-
+        switch (f) {
+            case DOWN:
+                return D;
+            case EAST:
+            case EAST_SOUTH_EAST:
+            case EAST_NORTH_EAST:
+                return E;
+            case NORTH:
+            case NORTH_WEST:
+            case NORTH_NORTH_WEST:
+            case NORTH_NORTH_EAST:
+            case NORTH_EAST:
+                return N;
+            case SELF:
+            case UP:
+                return U;
+            case SOUTH:
+            case SOUTH_WEST:
+            case SOUTH_SOUTH_WEST:
+            case SOUTH_SOUTH_EAST:
+            case SOUTH_EAST:
+                return S;
+            case WEST:
+            case WEST_SOUTH_WEST:
+            case WEST_NORTH_WEST:
+                return W;
+        }
+        return U;
     }
 
     @Override
     public String toString() {
-        return switch (this) {
-            case D -> "Down";
-            case E -> "East";
-            case N -> "North";
-            case S -> "South";
-            case U -> "Up";
-            case W -> "West";
-        };
-
+        switch (this) {
+            case D:
+                return "Down";
+            case E:
+                return "East";
+            case N:
+                return "North";
+            case S:
+                return "South";
+            case U:
+                return "Up";
+            case W:
+                return "West";
+        }
+        return "Unknown";
     }
 
     public boolean isVertical() {
@@ -360,23 +385,35 @@ public enum Direction {
     }
 
     public BlockFace getFace() {
-        return switch (this) {
-            case D -> BlockFace.DOWN;
-            case E -> BlockFace.EAST;
-            case N -> BlockFace.NORTH;
-            case S -> BlockFace.SOUTH;
-            case U -> BlockFace.UP;
-            case W -> BlockFace.WEST;
-        };
-
+        switch (this) {
+            case D:
+                return BlockFace.DOWN;
+            case E:
+                return BlockFace.EAST;
+            case N:
+                return BlockFace.NORTH;
+            case S:
+                return BlockFace.SOUTH;
+            case U:
+                return BlockFace.UP;
+            case W:
+                return BlockFace.WEST;
+        }
+        return BlockFace.UP;
     }
 
     public Axis getAxis() {
-        return switch (this) {
-            case D, U -> Axis.Y;
-            case E, W -> Axis.X;
-            case N, S -> Axis.Z;
-        };
-
+        switch (this) {
+            case D:
+            case U:
+                return Axis.Y;
+            case E:
+            case W:
+                return Axis.X;
+            case N:
+            case S:
+                return Axis.Z;
+        }
+        return Axis.X;
     }
 }

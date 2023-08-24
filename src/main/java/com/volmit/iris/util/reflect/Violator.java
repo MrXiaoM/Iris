@@ -43,8 +43,8 @@ public class Violator {
             return ((Class<?>) o).getCanonicalName();
         }
 
-        if (o instanceof Constructor<?> co) {
-
+        if (o instanceof Constructor<?>) {
+            Constructor<?> co = (Constructor<?>) o;
             StringBuilder mx = new StringBuilder();
 
             for (Class<?> i : co.getParameterTypes()) {
@@ -68,8 +68,8 @@ public class Violator {
             return id(((Method) o).getDeclaringClass(), null) + "." + ((Method) o).getName() + "(" + mx + ")";
         }
 
-        if (o instanceof Annotation a) {
-            return "@" + a.annotationType().getCanonicalName() + "[" + id(h, null) + "]";
+        if (o instanceof Annotation) {
+            return "@" + ((Annotation) o).annotationType().getCanonicalName() + "[" + id(h, null) + "]";
         }
 
         return o.hashCode() + o.toString();

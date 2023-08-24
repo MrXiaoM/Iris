@@ -215,7 +215,7 @@ public class IrisEngine extends BlockPopulator implements Engine {
             Hunk<BlockData> blocks = vblocks.listen((xx, y, zz, t) -> catchBlockUpdates(x + xx, y + getMinHeight(), z + zz, t));
 
             switch (getDimension().getTerrainMode()) {
-                case NORMAL -> {
+                case NORMAL: {
                     getFramework().getEngineParallax().generateParallaxArea(x >> 4, z >> 4);
                     getFramework().getTerrainActuator().actuate(x, z, vblocks, multicore);
                     getFramework().getBiomeActuator().actuate(x, z, vbiomes, multicore);
@@ -225,10 +225,11 @@ public class IrisEngine extends BlockPopulator implements Engine {
                     getFramework().getDecorantActuator().actuate(x, z, blocks, multicore);
                     getFramework().getEngineParallax().insertParallax(x >> 4, z >> 4, blocks);
                     getFramework().getDepositModifier().modify(x, z, blocks, multicore);
+                    break;
                 }
-                case ISLANDS -> {
+                case ISLANDS: {
                     getFramework().getTerrainActuator().actuate(x, z, vblocks, multicore);
-
+                    break;
                 }
             }
 

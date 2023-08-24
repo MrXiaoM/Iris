@@ -177,20 +177,38 @@ public class B {
             block = block.split("\\[")[0];
 
             switch (block) {
-                case "cauldron" -> block = "water_cauldron"; //Would fail to load if it has a level parameter
-                case "grass_path" -> block = "dirt_path";
-                case "concrete" -> block = "white_concrete";
-                case "wool" -> block = "white_wool";
-                case "beetroots" -> {
+                case "cauldron":
+                    block = "water_cauldron"; //Would fail to load if it has a level parameter
+                    break;
+                case "grass_path":
+                    block = "dirt_path";
+                    break;
+                case "concrete":
+                    block = "white_concrete";
+                    break;
+                case "wool":
+                    block = "white_wool";
+                    break;
+                case "beetroots": {
                     if (stateMap.containsKey("age")) {
                         String updated = stateMap.get("age");
                         switch (updated) {
-                            case "7" -> updated = "3";
-                            case "3", "4", "5" -> updated = "2";
-                            case "1", "2" -> updated = "1";
+                            case "7":
+                                updated = "3";
+                                break;
+                            case "3":
+                            case "4":
+                            case "5":
+                                updated = "2";
+                                break;
+                            case "1":
+                            case "2":
+                                updated = "1";
+                                break;
                         }
                         stateMap.put("age", updated);
                     }
+                    break;
                 }
             }
 
@@ -424,11 +442,11 @@ public class B {
             return false;
         }
 
-        if (onto.equals(Material.DIRT_PATH)) {
-            if (!mat.isSolid()) {
-                return false;
-            }
-        }
+        //if (onto.equals(Material.DIRT_PATH)) {
+        //    if (!mat.isSolid()) {
+        //        return false;
+        //    }
+        //}
 
         if (onto.equals(Material.ACACIA_LEAVES)
                 || onto.equals(Material.BIRCH_LEAVES)
@@ -524,7 +542,7 @@ public class B {
 
     public static boolean isFoliagePlantable(BlockData d) {
         return d.getMaterial().equals(Material.GRASS_BLOCK)
-                || d.getMaterial().equals(Material.ROOTED_DIRT)
+                //|| d.getMaterial().equals(Material.ROOTED_DIRT)
                 || d.getMaterial().equals(Material.DIRT)
                 || d.getMaterial().equals(Material.COARSE_DIRT)
                 || d.getMaterial().equals(Material.PODZOL);
@@ -533,7 +551,7 @@ public class B {
     public static boolean isFoliagePlantable(Material d) {
         return d.equals(Material.GRASS_BLOCK)
                 || d.equals(Material.DIRT)
-                || d.equals(Material.ROOTED_DIRT)
+                //|| d.equals(Material.ROOTED_DIRT)
                 || d.equals(Material.COARSE_DIRT)
                 || d.equals(Material.PODZOL);
     }

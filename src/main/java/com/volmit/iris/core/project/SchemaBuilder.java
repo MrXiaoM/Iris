@@ -126,8 +126,10 @@ public class SchemaBuilder {
         String fancyType = "Unknown Type";
 
         switch (type) {
-            case "boolean" -> fancyType = "Boolean";
-            case "integer" -> {
+            case "boolean":
+                fancyType = "Boolean";
+                break;
+            case "integer": {
                 fancyType = "Integer";
                 if (k.isAnnotationPresent(MinNumber.class)) {
                     int min = (int) k.getDeclaredAnnotation(MinNumber.class).value();
@@ -139,8 +141,9 @@ public class SchemaBuilder {
                     prop.put("maximum", max);
                     description.add(SYMBOL_LIMIT__N + " Maximum allowed is " + max);
                 }
+                break;
             }
-            case "number" -> {
+            case "number": {
                 fancyType = "Number";
                 if (k.isAnnotationPresent(MinNumber.class)) {
                     double min = k.getDeclaredAnnotation(MinNumber.class).value();
@@ -152,8 +155,9 @@ public class SchemaBuilder {
                     prop.put("maximum", max);
                     description.add(SYMBOL_LIMIT__N + " Maximum allowed is " + max);
                 }
+                break;
             }
-            case "string" -> {
+            case "string": {
                 fancyType = "Text";
                 if (k.isAnnotationPresent(MinNumber.class)) {
                     int min = (int) k.getDeclaredAnnotation(MinNumber.class).value();
@@ -222,11 +226,10 @@ public class SchemaBuilder {
                     prop.put("$ref", "#/definitions/" + key);
                     description.add(SYMBOL_TYPE__N + "  Must be a valid Item Type (use ctrl+space for auto complete!)");
 
-                } else if(k.isAnnotationPresent(RegistryListSpecialEntity.class)) {
+                } else if (k.isAnnotationPresent(RegistryListSpecialEntity.class)) {
                     String key = "enum-reg-specialentity";
 
-                    if(!definitions.containsKey(key))
-                    {
+                    if (!definitions.containsKey(key)) {
                         JSONObject j = new JSONObject();
                         KList<String> list = new KList<>();
                         list.addAll(Iris.linkMythicMobs.getMythicMobTypes().stream().map(s -> "MythicMobs:" + s).collect(Collectors.toList()));
@@ -310,8 +313,9 @@ public class SchemaBuilder {
                     description.add(SYMBOL_TYPE__N + "  Must be a valid " + k.getType().getSimpleName().replaceAll("\\QIris\\E", "") + " (use ctrl+space for auto complete!)");
 
                 }
+                break;
             }
-            case "object" -> {
+            case "object": {
                 fancyType = k.getType().getSimpleName().replaceAll("\\QIris\\E", "") + " (Object)";
                 String key = "obj-" + k.getType().getCanonicalName().replaceAll("\\Q.\\E", "-").toLowerCase();
                 if (!definitions.containsKey(key)) {
@@ -319,8 +323,9 @@ public class SchemaBuilder {
                     definitions.put(key, buildProperties(k.getType()));
                 }
                 prop.put("$ref", "#/definitions/" + key);
+                break;
             }
-            case "array" -> {
+            case "array": {
                 fancyType = "List of Something...?";
                 ArrayType t = k.getDeclaredAnnotation(ArrayType.class);
                 if (t != null) {
@@ -336,9 +341,13 @@ public class SchemaBuilder {
                     String arrayType = getType(t.type());
 
                     switch (arrayType) {
-                        case "integer" -> fancyType = "List of Integers";
-                        case "number" -> fancyType = "List of Numbers";
-                        case "object" -> {
+                        case "integer":
+                            fancyType = "List of Integers";
+                            break;
+                        case "number":
+                            fancyType = "List of Numbers";
+                            break;
+                        case "object": {
                             fancyType = "List of " + t.type().getSimpleName().replaceAll("\\QIris\\E", "") + "s (Objects)";
                             String key = "obj-" + t.type().getCanonicalName().replaceAll("\\Q.\\E", "-").toLowerCase();
                             if (!definitions.containsKey(key)) {
@@ -348,8 +357,9 @@ public class SchemaBuilder {
                             JSONObject items = new JSONObject();
                             items.put("$ref", "#/definitions/" + key);
                             prop.put("items", items);
+                            break;
                         }
-                        case "string" -> {
+                        case "string": {
                             fancyType = "List of Text";
 
                             if (k.isAnnotationPresent(RegistryListResource.class)) {
@@ -488,13 +498,17 @@ public class SchemaBuilder {
                                 prop.put("items", items);
                                 description.add(SYMBOL_TYPE__N + "  Must be a valid " + t.type().getSimpleName().replaceAll("\\QIris\\E", "") + " (use ctrl+space for auto complete!)");
                             }
+                            break;
                         }
                     }
                 } else {
                     warnings.add("Undefined array type for field " + k.getName() + " (" + k.getType().getSimpleName() + ") in class " + cl.getSimpleName());
                 }
+                break;
             }
-            default -> warnings.add("Unexpected Schema Type: " + type + " for field " + k.getName() + " (" + k.getType().getSimpleName() + ") in class " + cl.getSimpleName());
+            default:
+                warnings.add("Unexpected Schema Type: " + type + " for field " + k.getName() + " (" + k.getType().getSimpleName() + ") in class " + cl.getSimpleName());
+                break;
         }
 
         KList<String> d = new KList<>();

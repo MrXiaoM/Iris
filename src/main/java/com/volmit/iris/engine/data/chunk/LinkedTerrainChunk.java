@@ -99,10 +99,10 @@ public class LinkedTerrainChunk implements TerrainChunk {
         biome3D.setBiome(x, y, z, bio);
     }
 
-    @Override
-    public int getMinHeight() {
-        return rawChunkData.getMinHeight();
-    }
+    //@Override
+    //public int getMinHeight() {
+    //    return rawChunkData.getMinHeight();
+    //}
 
     @Override
     public int getMaxHeight() {

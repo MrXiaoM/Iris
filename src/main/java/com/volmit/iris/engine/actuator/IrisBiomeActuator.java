@@ -44,7 +44,8 @@ public class IrisBiomeActuator extends EngineAssignedActuator<Biome> {
     @BlockCoordinates
     private boolean injectBiome(Hunk<Biome> h, int x, int y, int z, Object bb) {
         try {
-            if (h instanceof BiomeGridHunkView hh) {
+            if (h instanceof BiomeGridHunkView) {
+                BiomeGridHunkView hh = (BiomeGridHunkView) h;
                 ChunkGenerator.BiomeGrid g = hh.getChunk();
                 if (g instanceof TerrainChunk) {
                     ((TerrainChunk) g).getBiomeBaseInjector().setBiome(x, y, z, bb);

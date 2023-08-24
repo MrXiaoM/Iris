@@ -35,12 +35,12 @@ import org.bukkit.util.Vector;
  */
 public class VectorMath {
     public static Vector scaleStatic(Axis x, Vector v, double amt) {
-        return switch (x) {
-            case X -> scaleX(v, amt);
-            case Y -> scaleY(v, amt);
-            case Z -> scaleZ(v, amt);
+        switch (x) {
+            case X: return scaleX(v, amt);
+            case Y: return scaleY(v, amt);
+            case Z: return scaleZ(v, amt);
         };
-
+        return v;
     }
 
     public static Vector scaleX(Vector v, double amt) {

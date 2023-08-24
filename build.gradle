@@ -21,48 +21,53 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.guardsquare:proguard-gradle:7.1.0'
+        classpath "com.guardsquare:proguard-gradle:7.1.0"
     }
 }
 
 plugins {
-    id 'java'
-    id 'io.freefair.lombok' version '5.2.1'
+    id "java"
+    id "io.freefair.lombok" version "5.2.1"
     id "com.github.johnrengelman.shadow" version "7.0.0"
 }
 
-group 'com.volmit.iris'
-version '1.6.2'
-def apiVersion = '1.17'
-def name = 'Iris'
-def main = 'com.volmit.iris.Iris'
+group "com.volmit.iris"
+version "1.6.2"
+def apiVersion = "1.16"
+def name = "Iris"
+def main = "com.volmit.iris.Iris"
 
 // ADD YOURSELF AS A NEW LINE IF YOU WANT YOUR OWN BUILD TASK GENERATED
 // ==============================================================
-registerCustomOutputTask('Cyberpwn', 'C://Users/cyberpwn/Documents/development/server/plugins');
-registerCustomOutputTask('Psycho', 'D://Dan/MinecraftDevelopment/server/plugins');
-registerCustomOutputTask('ArcaneArts', 'C://Users/arcane/Documents/development/server/plugins');
-registerCustomOutputTask('Coco', 'C:/Users/sjoer/Documents/Development/MCServer/plugins');
-registerCustomOutputTask('Strange', 'D://Servers/1.17 Test Server/plugins');
+//registerCustomOutputTask("Cyberpwn", "C://Users/cyberpwn/Documents/development/server/plugins");
+//registerCustomOutputTask("Psycho", "D://Dan/MinecraftDevelopment/server/plugins");
+//registerCustomOutputTask("ArcaneArts", "C://Users/arcane/Documents/development/server/plugins");
+//registerCustomOutputTask("Coco", "C:/Users/sjoer/Documents/Development/MCServer/plugins");
+//registerCustomOutputTask("Strange", "D://Servers/1.17 Test Server/plugins");
 // ==============================================================
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
 
 def dependsDir = "${buildDir}/libs/dependencies/"
 
 task copyDepends(type: Copy) {
     dependsOn(":shadowJar")
-    group('proguard')
+    group("proguard")
     from configurations.default
     into "${dependsDir}"
 }
 
 task release(type: proguard.gradle.ProGuardTask) {
     dependsOn(":copyDepends")
-    group('proguard')
-    configuration 'proguard.pro'
+    group("proguard")
+    configuration "proguard.pro"
     injars("${buildDir}/libs/" + name + "-" + version + "-all.jar")
     outjars("${buildDir}/production/" + name + "/" + version + "/" + name + "-" + version + ".jar")
-    libraryjars "${System.getProperty('java.home')}/lib/rt.jar"
-    libraryjars "${System.getProperty('java.home')}/jmods/"
+    libraryjars "${System.getProperty("java.home")}/lib/rt.jar"
+    libraryjars "${System.getProperty("java.home")}/jmods/"
     libraryjars "${dependsDir}"
     dontobfuscate()
     dontwarn()
@@ -73,48 +78,52 @@ task release(type: proguard.gradle.ProGuardTask) {
 }
 
 def registerCustomOutputTask(name, path) {
-    tasks.register('build' + name, Copy) {
-        group('development')
+    tasks.register("build" + name, Copy) {
+        group("development")
         outputs.upToDateWhen { false }
-        dependsOn ':shadowJar'
-        from(file('build/libs/Iris-' + version + '-all.jar'))
+        dependsOn ":shadowJar"
+        from(file("build/libs/Iris-" + version + "-all.jar"))
         into(file(path))
         rename { String fileName ->
-            fileName.replace('Iris-' + version + '-all.jar', "Iris.jar")
+            fileName.replace("Iris-" + version + "-all.jar", "Iris.jar")
         }
     }
 }
 
-file(jar.archiveFile.get().getAsFile().getParentFile().getParentFile().getParentFile().getAbsolutePath() + '/build/resources/main/plugin.yml').delete()
+file(jar.archiveFile.get().getAsFile().getParentFile().getParentFile().getParentFile().getAbsolutePath() + "/build/resources/main/plugin.yml").delete()
 
 processResources {
-    filesMatching('**/plugin.yml') {
+    filesMatching("**/plugin.yml") {
         expand(
-                'name': name.toString(),
-                'version': version.toString(),
-                'main': main.toString(),
-                'apiversion': apiVersion.toString()
+                "name": name.toString(),
+                "version": version.toString(),
+                "main": main.toString(),
+                "apiversion": apiVersion.toString()
         )
     }
 }
 
 repositories {
-    maven {
-        allowInsecureProtocol true
-        url "http://archive.arcane.art/repository/arcane"
-    }
     mavenLocal()
+    mavenCentral()
+    maven { url = "https://maven.fastmirror.net/repositories/minecraft" }
+    maven { url = "https://mvn.lumine.io/repository/maven/" }
+    maven { url = "https://repo.codemc.io/repository/maven-public/" }
+    maven {
+        name = "spigotmc-repo"
+        url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
+    }
 }
 
 shadowJar
         {
             append("plugin.yml")
             minimize()
-            relocate 'com.dfsek.paralithic', 'com.volmit.iris.util.paralithic'
-            relocate 'io.papermc.lib', 'com.volmit.iris.util.paper'
+            relocate "com.dfsek.paralithic", "com.volmit.iris.util.paralithic"
+            relocate "io.papermc.lib", "com.volmit.iris.util.paper"
             dependencies {
-                include(dependency('io.papermc:paperlib:1.0.5'))
-                include(dependency('com.dfsek:Paralithic:0.4.0'))
+                include(dependency("io.papermc:paperlib:1.0.5"))
+                include(dependency("com.dfsek:Paralithic:0.4.0"))
             }
         }
 
@@ -122,26 +131,22 @@ manifest()
 
 dependencies {
     // Provided or Classpath
-    compileOnly 'org.projectlombok:lombok:1.18.20'
-    annotationProcessor 'org.projectlombok:lombok:1.18.20'
-    implementation 'org.spigotmc:spigot-api:1.17-R0.1-SNAPSHOT'
-    implementation 'org.bukkit.craftbukkit:1.17:1.17'
-    implementation 'org.bukkit.craftbukkit:1.17.1:1.17.1'
-    implementation 'org.bukkit.craftbukkit:1.16.5:1.16.5'
-    implementation 'org.bukkit.craftbukkit:1.16.3:1.16.3'
-    implementation 'org.bukkit.craftbukkit:1.16.1:1.16.1'
-    implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT'
-    implementation 'me.clip:placeholderapi:2.10.10'
+    compileOnly "org.projectlombok:lombok:1.18.20"
+    annotationProcessor "org.projectlombok:lombok:1.18.20"
+    implementation "org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT"
+    implementation "org.bukkit:craftbukkit:1.16.5-R0.1-SNAPSHOT"
+    implementation "com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT"
+    implementation "me.clip:placeholderapi:2.10.10"
 
     // Shaded
-    implementation 'com.dfsek:Paralithic:0.4.0'
-    implementation 'io.papermc:paperlib:1.0.5'
+    implementation "com.dfsek:Paralithic:0.4.0"
+    implementation "io.papermc:paperlib:1.0.5"
 
     // Dynamically Loaded
-    implementation 'it.unimi.dsi:fastutil:8.5.4'
-    implementation 'com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:1.4.2'
-    implementation 'org.zeroturnaround:zt-zip:1.14'
-    implementation 'com.google.code.gson:gson:2.8.5'
-    implementation 'org.ow2.asm:asm:9.0'
-    implementation 'com.google.guava:guava:30.1.1-jre'
+    implementation "it.unimi.dsi:fastutil:8.5.4"
+    implementation "com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:1.4.2"
+    implementation "org.zeroturnaround:zt-zip:1.14"
+    implementation "com.google.code.gson:gson:2.8.5"
+    implementation "org.ow2.asm:asm:9.0"
+    implementation "com.google.guava:guava:30.1.1-jre"
 }

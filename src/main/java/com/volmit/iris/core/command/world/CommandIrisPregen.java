@@ -37,11 +37,10 @@ public class CommandIrisPregen extends MortarCommand {
     public CommandIrisPregen() {
         super("pregen", "preg", "p");
         setDescription(
-                """
-                        Pregen this world with optional parameters:\s
-                        '1k' = 1000 * 2 by 1000 * 2 blocks, '1c' = 2 by 2 chunks, and '1r' = 64 by 64 chunks.
-                        If you are using the console or want to pregen a world you're not in:
-                        also specify the name of the world. E.g. /ir pregen 5k world"""
+                "Pregen this world with optional parameters: \n" +
+                        "'1k' = 1000 * 2 by 1000 * 2 blocks, '1c' = 2 by 2 chunks, and '1r' = 64 by 64 chunks.\n" +
+                        "If you are using the console or want to pregen a world you're not in:\n" +
+                        "also specify the name of the world. E.g. /ir pregen 5k world"
         );
         requiresPermission(Iris.perm.studio);
         setCategory("Pregen");

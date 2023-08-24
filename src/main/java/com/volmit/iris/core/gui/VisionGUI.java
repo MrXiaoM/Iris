@@ -191,12 +191,27 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         BiFunction<Double, Double, Integer> colorFunction = (d, dx) -> Color.black.getRGB();
 
         switch (currentType) {
-            case BIOME, DECORATOR_LOAD, OBJECT_LOAD, LAYER_LOAD -> colorFunction = (x, z) -> engine.getFramework().getComplex().getTrueBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
-            case BIOME_LAND -> colorFunction = (x, z) -> engine.getFramework().getComplex().getLandBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
-            case BIOME_SEA -> colorFunction = (x, z) -> engine.getFramework().getComplex().getSeaBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
-            case REGION -> colorFunction = (x, z) -> engine.getFramework().getComplex().getRegionStream().get(x, z).getColor(engine.getFramework().getComplex(), currentType).getRGB();
-            case CAVE_LAND -> colorFunction = (x, z) -> engine.getFramework().getComplex().getCaveBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
-            case HEIGHT -> colorFunction = (x, z) -> Color.getHSBColor(engine.getFramework().getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
+            case BIOME:
+            case DECORATOR_LOAD:
+            case OBJECT_LOAD:
+            case LAYER_LOAD:
+                colorFunction = (x, z) -> engine.getFramework().getComplex().getTrueBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                break;
+            case BIOME_LAND:
+                colorFunction = (x, z) -> engine.getFramework().getComplex().getLandBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                break;
+            case BIOME_SEA:
+                colorFunction = (x, z) -> engine.getFramework().getComplex().getSeaBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                break;
+            case REGION:
+                colorFunction = (x, z) -> engine.getFramework().getComplex().getRegionStream().get(x, z).getColor(engine.getFramework().getComplex(), currentType).getRGB();
+                break;
+            case CAVE_LAND:
+                colorFunction = (x, z) -> engine.getFramework().getComplex().getCaveBiomeStream().get(x, z).getColor(engine, currentType).getRGB();
+                break;
+            case HEIGHT:
+                colorFunction = (x, z) -> Color.getHSBColor(engine.getFramework().getComplex().getHeightStream().get(x, z).floatValue(), 100, 100).getRGB();
+                break;
         }
 
         return colorFunction.apply(wx, wz);
@@ -695,11 +710,25 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         IrisComplex complex = engine.getFramework().getComplex();
         File r = null;
         switch (currentType) {
-            case BIOME, LAYER_LOAD, DECORATOR_LOAD, OBJECT_LOAD, HEIGHT -> r = complex.getTrueBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
-            case BIOME_LAND -> r = complex.getLandBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
-            case BIOME_SEA -> r = complex.getSeaBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
-            case REGION -> r = complex.getRegionStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
-            case CAVE_LAND -> r = complex.getCaveBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+            case BIOME:
+            case LAYER_LOAD:
+            case DECORATOR_LOAD:
+            case OBJECT_LOAD:
+            case HEIGHT:
+                r = complex.getTrueBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+                break;
+            case BIOME_LAND:
+                r = complex.getLandBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+                break;
+            case BIOME_SEA:
+                r = complex.getSeaBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+                break;
+            case REGION:
+                r = complex.getRegionStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+                break;
+            case CAVE_LAND:
+                r = complex.getCaveBiomeStream().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
+                break;
         }
 
         notify("Opening " + r.getPath() + " in VSCode");

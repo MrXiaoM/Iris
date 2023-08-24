@@ -54,13 +54,25 @@ public class CommandIrisBitwise extends MortarCommand {
                     int v = 0;
 
                     switch (op) {
-                        case "|" -> v = a | b;
-                        case "&" -> v = a & b;
-                        case "^" -> v = a ^ b;
-                        case "%" -> v = a % b;
-                        case ">>" -> v = a >> b;
-                        case "<<" -> v = a << b;
-                        default -> {
+                        case "|":
+                            v = a | b;
+                            break;
+                        case "&":
+                            v = a & b;
+                            break;
+                        case "^":
+                            v = a ^ b;
+                            break;
+                        case "%":
+                            v = a % b;
+                            break;
+                        case ">>":
+                            v = a >> b;
+                            break;
+                        case "<<":
+                            v = a << b;
+                            break;
+                        default: {
                             {
                                 sender.sendMessage("Error Invalid operation");
                                 return true;
@@ -78,13 +90,25 @@ public class CommandIrisBitwise extends MortarCommand {
                 int v = 0;
 
                 switch (op) {
-                    case "|" -> v = a | b;
-                    case "&" -> v = a & b;
-                    case "^" -> v = a ^ b;
-                    case "%" -> v = a % b;
-                    case ">>" -> v = a >> b;
-                    case "<<" -> v = a << b;
-                    default -> {
+                    case "|":
+                        v = a | b;
+                        break;
+                    case "&":
+                        v = a & b;
+                        break;
+                    case "^":
+                        v = a ^ b;
+                        break;
+                    case "%":
+                        v = a % b;
+                        break;
+                    case ">>":
+                        v = a >> b;
+                        break;
+                    case "<<":
+                        v = a << b;
+                        break;
+                    default: {
                         {
                             sender.sendMessage("Error Invalid operation");
                             return true;

@@ -209,13 +209,12 @@ public class ProjectManager {
             Iris.reportError(e);
             e.printStackTrace();
             sender.sendMessage(
-                    """
-                            Issue when unpacking. Please check/do the following:
-                            1. Do you have a functioning internet connection?
-                            2. Did the download corrupt?
-                            3. Try deleting the */plugins/iris/packs folder and re-download.
-                            4. Download the pack from the GitHub repo: https://github.com/IrisDimensions/overworld
-                            5. Contact support (if all other options do not help)"""
+                    "Issue when unpacking. Please check/do the following:\n" +
+                            "1. Do you have a functioning internet connection?\n" +
+                            "2. Did the download corrupt?\n" +
+                            "3. Try deleting the */plugins/iris/packs folder and re-download.\n" +
+                            "4. Download the pack from the GitHub repo: https://github.com/IrisDimensions/overworld\n" +
+                            "5. Contact support (if all other options do not help)"
             );
         }
         File dir = null;

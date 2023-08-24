@@ -498,14 +498,13 @@ public class IrisDimension extends IrisRegistrant {
         if (write) {
             File mcm = new File(datapacks, "iris/pack.mcmeta");
             try {
-                IO.writeAll(mcm, """
-                        {
-                            "pack": {
-                                "description": "Iris Data Pack. This pack contains all installed Iris Packs' resources.",
-                                "pack_format": 7
-                            }
-                        }
-                        """);
+                IO.writeAll(mcm,
+                        "{\n" +
+                        "    \"pack\": {\n" +
+                        "        \"description\": \"Iris Data Pack. This pack contains all installed Iris Packs' resources.\",\n" +
+                        "        \"pack_format\": 6\n" +
+                        "    }\n" +
+                        "}\n");
             } catch (IOException e) {
                 Iris.reportError(e);
                 e.printStackTrace();

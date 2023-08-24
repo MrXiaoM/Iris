@@ -24,6 +24,7 @@ import com.volmit.iris.engine.object.annotations.Desc;
 import com.volmit.iris.engine.object.basic.IrisRate;
 import com.volmit.iris.engine.object.basic.IrisTimeBlock;
 import com.volmit.iris.engine.object.basic.IrisWeather;
+import com.volmit.iris.engine.object.biome.InferredType;
 import com.volmit.iris.engine.object.biome.IrisBiome;
 import com.volmit.iris.engine.object.entity.IrisEntitySpawn;
 import com.volmit.iris.util.collection.KList;
@@ -61,21 +62,17 @@ public class IrisSpawner extends IrisRegistrant {
     private IrisSpawnGroup group = IrisSpawnGroup.NORMAL;
 
     public boolean isValid(IrisBiome biome) {
-        return switch (group) {
-            case NORMAL -> switch (biome.getInferredType()) {
-                case SHORE, SEA, CAVE, RIVER, LAKE, DEFER -> false;
-                case LAND -> true;
-            };
-            case CAVE -> true;
-            case UNDERWATER -> switch (biome.getInferredType()) {
-                case SHORE, LAND, CAVE, RIVER, LAKE, DEFER -> false;
-                case SEA -> true;
-            };
-            case BEACH -> switch (biome.getInferredType()) {
-                case SHORE -> true;
-                case LAND, CAVE, RIVER, LAKE, SEA, DEFER -> false;
-            };
-        };
+        switch (group) {
+            case NORMAL:
+                return biome.getInferredType().equals(InferredType.LAND);
+            case CAVE:
+                return true;
+            case UNDERWATER:
+                return biome.getInferredType().equals(InferredType.SEA);
+            case BEACH:
+                return biome.getInferredType().equals(InferredType.SHORE);
+        }
+        return false;
     }
 
     public boolean isValid(World world) {

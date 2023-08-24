@@ -72,10 +72,10 @@ public class MCATerrainChunk implements TerrainChunk {
         writer.setBiome(ox + x, y, oz + z, bio);
     }
 
-    @Override
-    public int getMinHeight() {
-        return minHeight;
-    }
+    //@Override
+    //public int getMinHeight() {
+    //    return minHeight;
+    //}
 
     @Override
     public int getMaxHeight() {

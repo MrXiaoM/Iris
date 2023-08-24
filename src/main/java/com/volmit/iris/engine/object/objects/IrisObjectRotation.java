@@ -194,29 +194,31 @@ public class IrisObjectRotation {
     }
 
     public BlockFace faceForAxis(Axis axis) {
-        return switch (axis) {
-            case X -> BlockFace.EAST;
-            case Y -> BlockFace.UP;
-            case Z -> BlockFace.NORTH;
-        };
-
+        switch (axis) {
+            case X: return BlockFace.EAST;
+            case Y: return BlockFace.UP;
+            case Z: return BlockFace.NORTH;
+        }
+        return BlockFace.UP;
     }
 
     public Axis axisFor(BlockFace f) {
-        return switch (f) {
-            case NORTH, SOUTH -> Axis.Z;
-            case EAST, WEST -> Axis.X;
-            default -> Axis.Y;
-        };
-
+        switch (f) {
+            case NORTH: case SOUTH: return Axis.Z;
+            case EAST: case WEST: return Axis.X;
+        }
+        return Axis.Y;
     }
 
     public Axis axisFor2D(BlockFace f) {
-        return switch (f) {
-            case EAST, WEST, UP, DOWN -> Axis.X;
-            default -> Axis.Z;
-        };
-
+        switch (f) {
+            case EAST:
+            case WEST:
+            case UP:
+            case DOWN:
+                return Axis.X;
+        }
+        return Axis.Z;
     }
 
     public BlockData rotate(BlockData dd, int spinxx, int spinyy, int spinzz) {
@@ -230,7 +232,8 @@ public class IrisObjectRotation {
                 return d;
             }
 
-            if (d instanceof Directional g) {
+            if (d instanceof Directional) {
+                Directional g = (Directional) d;
                 BlockFace f = g.getFacing();
                 BlockVector bv = new BlockVector(f.getModX(), f.getModY(), f.getModZ());
                 bv = rotate(bv.clone(), spinx, spiny, spinz);
@@ -241,7 +244,8 @@ public class IrisObjectRotation {
                 } else if (!g.getMaterial().isSolid()) {
                     d = null;
                 }
-            } else if (d instanceof Rotatable g) {
+            } else if (d instanceof Rotatable) {
+                Rotatable g = (Rotatable) d;
                 BlockFace f = g.getRotation();
 
                 BlockVector bv = new BlockVector(f.getModX(), 0, f.getModZ());
@@ -259,7 +263,8 @@ public class IrisObjectRotation {
                 if (!a.equals(((Orientable) d).getAxis()) && ((Orientable) d).getAxes().contains(a)) {
                     ((Orientable) d).setAxis(a);
                 }
-            } else if (d instanceof MultipleFacing g) {
+            } else if (d instanceof MultipleFacing) {
+                MultipleFacing g = (MultipleFacing) d;
                 List<BlockFace> faces = new KList<>();
 
                 for (BlockFace i : g.getFaces()) {
@@ -279,7 +284,8 @@ public class IrisObjectRotation {
                 for (BlockFace i : faces) {
                     g.setFace(i, true);
                 }
-            } else if (d.getMaterial().equals(Material.NETHER_PORTAL) && d instanceof Orientable g) {
+            } else if (d.getMaterial().equals(Material.NETHER_PORTAL) && d instanceof Orientable) {
+                Orientable g = (Orientable) d;
                 //TODO: Fucks up logs
                 BlockFace f = faceForAxis(g.getAxis());
                 BlockVector bv = new BlockVector(f.getModX(), f.getModY(), f.getModZ());
@@ -313,11 +319,12 @@ public class IrisObjectRotation {
     }
 
     private BlockFace getFace(Axis axis) {
-        return switch (axis) {
-            case X -> BlockFace.EAST;
-            case Y -> BlockFace.UP;
-            case Z -> BlockFace.SOUTH;
+        switch (axis) {
+            case X: return BlockFace.EAST;
+            case Y: return BlockFace.UP;
+            case Z: return BlockFace.SOUTH;
         };
+        return BlockFace.UP;
     }
 
     public IrisPosition rotate(IrisPosition b) {

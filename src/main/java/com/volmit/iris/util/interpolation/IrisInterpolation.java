@@ -845,20 +845,21 @@ public class IrisInterpolation {
     }
 
     public static double getNoise3D(InterpolationMethod3D method, int x, int y, int z, double radx, double rady, double radz, NoiseProvider3 n) {
-        return switch (method) {
-            case TRILINEAR -> getTrilinear(x, y, z, radx, rady, radz, n);
-            case TRICUBIC -> getTricubic(x, y, z, radx, rady, radz, n);
-            case TRIHERMITE -> getTrihermite(x, y, z, radx, rady, radz, n);
-            case TRISTARCAST_3 -> getStarcast3D(x, y, z, radx, 3D, n);
-            case TRISTARCAST_6 -> getStarcast3D(x, y, z, radx, 6D, n);
-            case TRISTARCAST_9 -> getStarcast3D(x, y, z, radx, 9D, n);
-            case TRISTARCAST_12 -> getStarcast3D(x, y, z, radx, 12D, n);
-            case TRILINEAR_TRISTARCAST_3 -> getStarcast3D(x, y, z, radx, 3D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_6 -> getStarcast3D(x, y, z, radx, 6D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_9 -> getStarcast3D(x, y, z, radx, 9D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_12 -> getStarcast3D(x, y, z, radx, 12D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case NONE -> n.noise(x, y, z);
-        };
+        switch (method) {
+            case TRILINEAR: return getTrilinear(x, y, z, radx, rady, radz, n);
+            case TRICUBIC: return getTricubic(x, y, z, radx, rady, radz, n);
+            case TRIHERMITE: return getTrihermite(x, y, z, radx, rady, radz, n);
+            case TRISTARCAST_3: return getStarcast3D(x, y, z, radx, 3D, n);
+            case TRISTARCAST_6: return getStarcast3D(x, y, z, radx, 6D, n);
+            case TRISTARCAST_9: return getStarcast3D(x, y, z, radx, 9D, n);
+            case TRISTARCAST_12: return getStarcast3D(x, y, z, radx, 12D, n);
+            case TRILINEAR_TRISTARCAST_3: return getStarcast3D(x, y, z, radx, 3D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
+            case TRILINEAR_TRISTARCAST_6: return getStarcast3D(x, y, z, radx, 6D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
+            case TRILINEAR_TRISTARCAST_9: return getStarcast3D(x, y, z, radx, 9D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
+            case TRILINEAR_TRISTARCAST_12: return getStarcast3D(x, y, z, radx, 12D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
+            case NONE: return n.noise(x, y, z);
+        }
+        return n.noise(x, y, z);
     }
 
     public static Hunk<Double> getNoise3D(InterpolationMethod3D method, int xo, int yo, int zo, int w, int h, int d, double rad, NoiseProvider3 n) {

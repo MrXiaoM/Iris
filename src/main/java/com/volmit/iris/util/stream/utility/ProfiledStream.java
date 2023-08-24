@@ -116,8 +116,8 @@ public class ProfiledStream<T> extends BasicStream<T> {
     }
 
     private static ProfiledTail getTail(ProceduralStream<?> t) {
-        if (t instanceof ProfiledStream<?> s) {
-
+        if (t instanceof ProfiledStream<?>) {
+            ProfiledStream<?> s = (ProfiledStream<?>) t;
             return new ProfiledTail(s.getId(), s.getMetrics(), s.getClass().getSimpleName().replaceAll("\\QStream\\E", ""));
         }
 

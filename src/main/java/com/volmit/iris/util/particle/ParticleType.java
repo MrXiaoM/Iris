@@ -162,14 +162,17 @@ public enum ParticleType {
     }
 
     public Class<?> getDataType() {
-        return switch (this) {
-            case ITEM_CRACK -> ItemStack.class;
-            case BLOCK_CRACK, BLOCK_DUST, FALLING_DUST ->
-                    //noinspection deprecation
-                    MaterialData.class;
-            case REDSTONE -> Color.class;
-            default -> Void.class;
-        };
+        switch (this) {
+            case ITEM_CRACK:
+                return ItemStack.class;
+            case BLOCK_CRACK:
+            case BLOCK_DUST:
+            case FALLING_DUST:
+                return MaterialData.class;
+            case REDSTONE:
+                return Color.class;
+        }
+        return Void.class;
     }
 
     public static ParticleType getParticle(String particleName) {

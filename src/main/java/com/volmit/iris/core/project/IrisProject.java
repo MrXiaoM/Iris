@@ -238,10 +238,18 @@ public class IrisProject {
                     }
 
                     switch (i.getType()) {
-                        case ERROR -> Iris.error(i.toString());
-                        case SEVERE_WARNING -> Iris.warn(i.toString());
-                        case WARNING -> Iris.warn(i.toString());
-                        case NOTICE -> Iris.warn(i.toString());
+                        case ERROR:
+                            Iris.error(i.toString());
+                            break;
+                        case SEVERE_WARNING:
+                            Iris.warn(i.toString());
+                            break;
+                        case WARNING:
+                            Iris.warn(i.toString());
+                            break;
+                        case NOTICE:
+                            Iris.warn(i.toString());
+                            break;
                     }
                 }
                 Iris.error("===========================================================");

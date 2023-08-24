@@ -70,26 +70,29 @@ public class CommandIrisCreate extends MortarCommand {
         String pre = split[0].toLowerCase();
 
         switch (pre) {
-            case "type" -> {
+            case "type": {
                 for (String s : Iris.proj.getListing(true).keySet()) {
                     list.add("type=" + s);
                 }
                 if (!list.contains("type=overworld")) {
                     list.contains("type=overworld");
                 }
+                break;
             }
-            case "seed" -> {
+            case "seed": {
                 list.add("seed=1337");
                 list.add("seed=" + new Random().nextInt());
                 list.add("seed=random");
+                break;
             }
-            case "pregen" -> {
+            case "pregen": {
                 list.add("500");
                 list.add("1000");
                 list.add("2000");
                 list.add("5k");
                 list.add("10k");
                 list.add("25k");
+                break;
             }
         }
     }

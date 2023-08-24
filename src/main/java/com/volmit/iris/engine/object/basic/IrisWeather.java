@@ -36,11 +36,12 @@ public enum IrisWeather {
     ANY;
 
     public boolean is(World world) {
-        return switch (this) {
-            case NONE -> world.isClearWeather();
-            case DOWNFALL -> world.hasStorm();
-            case DOWNFALL_WITH_THUNDER -> world.hasStorm() && world.isThundering();
-            case ANY -> true;
-        };
+        switch (this) {
+            case NONE: return world.isClearWeather();
+            case DOWNFALL: return world.hasStorm();
+            case DOWNFALL_WITH_THUNDER: return world.hasStorm() && world.isThundering();
+            case ANY: return true;
+        }
+        return false;
     }
 }

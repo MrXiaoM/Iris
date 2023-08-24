@@ -54,8 +54,8 @@ public class BlockPosition {
             return false;
         }
 
-        if (o instanceof BlockPosition ot) {
-
+        if (o instanceof BlockPosition) {
+            BlockPosition ot = (BlockPosition) o;
             return ot.x == x && ot.y == y && ot.z == z;
         }
 

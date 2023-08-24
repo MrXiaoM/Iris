@@ -823,9 +823,15 @@ public class IrisObject extends IrisRegistrant {
 
         if (scale > 1) {
             switch (interpolation) {
-                case TRILINEAR -> oo.trilinear((int) Math.round(scale));
-                case TRICUBIC -> oo.tricubic((int) Math.round(scale));
-                case TRIHERMITE -> oo.trihermite((int) Math.round(scale));
+                case TRILINEAR:
+                    oo.trilinear((int) Math.round(scale));
+                    break;
+                case TRICUBIC:
+                    oo.tricubic((int) Math.round(scale));
+                    break;
+                case TRIHERMITE:
+                    oo.trihermite((int) Math.round(scale));
+                    break;
             }
         }
 

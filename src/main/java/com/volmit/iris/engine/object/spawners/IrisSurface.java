@@ -52,8 +52,8 @@ public enum IrisSurface {
         if (type.isSolid()) {
             return this == LAND || this == OVERWORLD || (this == ANIMAL
                     && (type == Material.GRASS_BLOCK || type == Material.DIRT
-                    || type == Material.DIRT_PATH || type == Material.COARSE_DIRT
-                    || type == Material.ROOTED_DIRT || type == Material.PODZOL
+                    /*|| type == Material.DIRT_PATH*/ || type == Material.COARSE_DIRT
+                    /*|| type == Material.ROOTED_DIRT*/ || type == Material.PODZOL
                     || type == Material.MYCELIUM || type == Material.SNOW_BLOCK));
         }
         if (type == Material.LAVA) return this == LAVA;

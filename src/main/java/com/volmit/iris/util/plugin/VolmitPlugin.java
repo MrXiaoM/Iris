@@ -117,7 +117,8 @@ public abstract class VolmitPlugin extends JavaPlugin implements Listener {
 
         for (Iterator<Map.Entry<String, Command>> it = commands.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<String, Command> entry = it.next();
-            if (entry.getValue() instanceof PluginCommand c) {
+            if (entry.getValue() instanceof PluginCommand) {
+                PluginCommand c = (PluginCommand) entry.getValue();
                 if (c.getPlugin() == plugin) {
                     c.unregister(commandMap);
                     it.remove();

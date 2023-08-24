@@ -125,7 +125,8 @@ public class IrisLoot {
             ItemStack is = new ItemStack(getType(), Math.max(1, rng.i(getMinAmount(), getMaxAmount())));
             ItemMeta m = is.getItemMeta();
 
-            if (getType().getMaxDurability() > 0 && m instanceof Damageable d) {
+            if (getType().getMaxDurability() > 0 && m instanceof Damageable) {
+                Damageable d = (Damageable) m;
                 int max = getType().getMaxDurability();
                 d.setDamage((int) Math.round(Math.max(0, Math.min(max, (1D - rng.d(getMinDurability(), getMaxDurability())) * max))));
             }
@@ -210,7 +211,8 @@ public class IrisLoot {
                 ItemStack is = new ItemStack(getType(), Math.max(1, rng.i(getMinAmount(), getMaxAmount())));
                 ItemMeta m = is.getItemMeta();
 
-                if (getType().getMaxDurability() > 0 && m instanceof Damageable d) {
+                if (getType().getMaxDurability() > 0 && m instanceof Damageable) {
+                    Damageable d = (Damageable) m;
                     int max = getType().getMaxDurability();
                     d.setDamage((int) Math.round(Math.max(0, Math.min(max, (1D - rng.d(getMinDurability(), getMaxDurability())) * max))));
                 }

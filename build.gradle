@@ -170,8 +170,9 @@ dependencies {
     // Provided or Classpath
     compileOnly 'org.projectlombok:lombok:1.18.20'
     annotationProcessor 'org.projectlombok:lombok:1.18.20'
-    implementation 'org.spigotmc:spigot-api:1.17.1-R0.1-SNAPSHOT'
-    implementation 'org.bukkit.craftbukkit:1.17.1:1.17.1'
+    implementation 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    implementation 'org.bukkit:craftbukkit:1.16.5-R0.1-SNAPSHOT'
+    implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT'
     implementation 'me.clip:placeholderapi:2.10.10'
     implementation 'io.th0rgal:oraxen:1.94.0'
 

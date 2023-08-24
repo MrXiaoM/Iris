@@ -41,6 +41,7 @@ import com.volmit.iris.util.scheduling.jobs.QueueJob;
 import org.bukkit.Chunk;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -171,7 +172,13 @@ public class CommandIris implements DecreeExecutor {
                     boolean overwrite
     ) {
         sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : ""));
-        Iris.service(StudioSVC.class).downloadSearch(sender(), "IrisDimensions/" + pack + "/" + branch, trim, overwrite);
+        try {
+            Iris.service(StudioSVC.class).download(sender(), pack, branch, trim, overwrite);
+        } catch (IOException e) {
+            Iris.reportError(e);
+            e.printStackTrace();
+            sender().sendMessage("Failed to download '" + pack + "' (" + branch + ")");
+        }
     }
 
     @Decree(description = "Get metrics for your world", aliases = "measure", origin = DecreeOrigin.PLAYER)

@@ -22,7 +22,6 @@ import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.link.IrisPapiExpansion;
 import com.volmit.iris.core.link.MultiverseCoreLink;
 import com.volmit.iris.core.link.MythicMobsLink;
-import com.volmit.iris.core.link.OraxenLink;
 import com.volmit.iris.core.loader.IrisData;
 import com.volmit.iris.core.nms.INMS;
 import com.volmit.iris.core.service.StudioSVC;
@@ -59,6 +58,9 @@ import io.papermc.lib.PaperLib;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.flattener.ComponentFlattener;
+import net.kyori.adventure.text.flattener.FlattenerListener;
 import net.kyori.adventure.text.serializer.ComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -91,7 +93,6 @@ public class Iris extends VolmitPlugin implements Listener {
     public static Iris instance;
     public static BukkitAudiences audiences;
     public static MultiverseCoreLink linkMultiverseCore;
-    public static OraxenLink linkOraxen;
     public static MythicMobsLink linkMythicMobs;
     public static IrisCompat compat;
     public static FileWatcher configWatcher;
@@ -421,7 +422,6 @@ public class Iris extends VolmitPlugin implements Listener {
         instance = this;
         compat = IrisCompat.configured(getDataFile("compat.json"));
         linkMultiverseCore = new MultiverseCoreLink();
-        linkOraxen = new OraxenLink();
         linkMythicMobs = new MythicMobsLink();
         configWatcher = new FileWatcher(getDataFile("settings.json"));
         services.values().forEach(IrisService::onEnable);
@@ -475,6 +475,11 @@ public class Iris extends VolmitPlugin implements Listener {
                 }
 
                 @Override
+                public @NotNull Audience permission(@NotNull Key permission) {
+                    return BukkitAudiences.super.permission(permission);
+                }
+
+                @Override
                 public @NotNull Audience permission(@NotNull String permission) {
                     return dummy;
                 }
@@ -490,8 +495,12 @@ public class Iris extends VolmitPlugin implements Listener {
                 }
 
                 @Override
-                public void close() {
+                public @NotNull ComponentFlattener flattener() {
+                    return ComponentFlattener.basic();
+                }
 
+                @Override
+                public void close() {
                 }
             };
         }

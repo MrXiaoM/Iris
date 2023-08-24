@@ -530,7 +530,7 @@ public class VirtualDecreeCommand {
         Iris.service(CommandSVC.class).post(password, future);
 
         if (IrisSettings.get().getGeneral().isCommandSounds() && sender.isPlayer()) {
-            (sender.player()).playSound((sender.player()).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 0.65f);
+            //(sender.player()).playSound((sender.player()).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 0.65f);
             (sender.player()).playSound((sender.player()).getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 0.125f, 1.99f);
         }
 

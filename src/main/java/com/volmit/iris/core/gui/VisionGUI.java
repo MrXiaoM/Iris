@@ -741,7 +741,7 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         IrisComplex complex = engine.getComplex();
         File r = null;
         switch (currentType) {
-            case BIOME: case LAYER_LOAD: case DECORATOR_LOAD: case OBJECT_LOAD, HEIGHT:
+            case BIOME: case LAYER_LOAD: case DECORATOR_LOAD: case OBJECT_LOAD: case HEIGHT:
                 r = complex.getTrueBiomeStreamNoFeatures().get(getWorldX(hx), getWorldZ(hz)).openInVSCode();
                 break;
             case BIOME_LAND:

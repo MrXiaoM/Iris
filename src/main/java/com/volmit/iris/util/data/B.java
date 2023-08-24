@@ -23,22 +23,15 @@ import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.service.RegistrySVC;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.scheduling.ChronoLatch;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
-import it.unimi.dsi.fastutil.ints.IntSets;
+import it.unimi.dsi.fastutil.ints.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.block.data.type.Leaves;
-import org.bukkit.block.data.type.PointedDripstone;
 
-import javax.imageio.spi.RegisterableService;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -95,6 +88,7 @@ public class B {
 
     private static IntSet buildDeepslateCache() {
         IntSet b = new IntOpenHashSet();
+/*
         Arrays.stream(new Material[]{
                 DEEPSLATE,
                 DEEPSLATE_BRICKS,
@@ -107,13 +101,13 @@ public class B {
                 DEEPSLATE_TILE_WALL,
                 CRACKED_DEEPSLATE_TILES
         }).forEach((i) -> b.add(i.ordinal()));
-
+*/
         return IntSets.unmodifiable(b);
     }
 
     private static Int2IntMap buildNormal2DeepslateCache() {
         Int2IntMap b = new Int2IntOpenHashMap();
-
+/*
         b.put(COAL_ORE.ordinal(), DEEPSLATE_COAL_ORE.ordinal());
         b.put(EMERALD_ORE.ordinal(), DEEPSLATE_EMERALD_ORE.ordinal());
         b.put(DIAMOND_ORE.ordinal(), DEEPSLATE_DIAMOND_ORE.ordinal());
@@ -122,13 +116,13 @@ public class B {
         b.put(IRON_ORE.ordinal(), DEEPSLATE_IRON_ORE.ordinal());
         b.put(LAPIS_ORE.ordinal(), DEEPSLATE_LAPIS_ORE.ordinal());
         b.put(REDSTONE_ORE.ordinal(), DEEPSLATE_REDSTONE_ORE.ordinal());
-
+ */
         return b;
     }
 
     private static Int2IntMap buildDeepslate2NormalCache() {
         Int2IntMap b = new Int2IntOpenHashMap();
-
+/*
         b.put(DEEPSLATE_COAL_ORE.ordinal(), COAL_ORE.ordinal());
         b.put(DEEPSLATE_EMERALD_ORE.ordinal(), EMERALD_ORE.ordinal());
         b.put(DEEPSLATE_DIAMOND_ORE.ordinal(), DIAMOND_ORE.ordinal());
@@ -137,7 +131,7 @@ public class B {
         b.put(DEEPSLATE_IRON_ORE.ordinal(), IRON_ORE.ordinal());
         b.put(DEEPSLATE_LAPIS_ORE.ordinal(), LAPIS_ORE.ordinal());
         b.put(DEEPSLATE_REDSTONE_ORE.ordinal(), REDSTONE_ORE.ordinal());
-
+*/
         return b;
     }
 
@@ -208,10 +202,10 @@ public class B {
         IntSet b = new IntOpenHashSet();
         Arrays.stream(new Material[]{
                 GLOWSTONE,
-                AMETHYST_CLUSTER,
-                SMALL_AMETHYST_BUD,
-                MEDIUM_AMETHYST_BUD,
-                LARGE_AMETHYST_BUD,
+                //AMETHYST_CLUSTER,
+                //SMALL_AMETHYST_BUD,
+                //MEDIUM_AMETHYST_BUD,
+                //LARGE_AMETHYST_BUD,
                 END_ROD,
                 SOUL_SAND,
                 TORCH,
@@ -221,11 +215,11 @@ public class B {
                 WALL_TORCH,
                 SOUL_WALL_TORCH,
                 LANTERN,
-                CANDLE,
+                //CANDLE,
                 JACK_O_LANTERN,
                 REDSTONE_LAMP,
                 MAGMA_BLOCK,
-                LIGHT,
+                //LIGHT,
                 SHROOMLIGHT,
                 SEA_LANTERN,
                 SOUL_LANTERN,
@@ -343,7 +337,7 @@ public class B {
 
     public static boolean isFoliagePlantable(BlockData d) {
         return d.getMaterial().equals(Material.GRASS_BLOCK)
-                || d.getMaterial().equals(Material.ROOTED_DIRT)
+                //|| d.getMaterial().equals(Material.ROOTED_DIRT)
                 || d.getMaterial().equals(Material.DIRT)
                 || d.getMaterial().equals(Material.COARSE_DIRT)
                 || d.getMaterial().equals(Material.PODZOL);
@@ -359,7 +353,7 @@ public class B {
                 || d.equals(PEONY)
                 || d.equals(LILAC)
                 || d.equals(ROSE_BUSH)
-                || d.equals(Material.ROOTED_DIRT)
+                //|| d.equals(Material.ROOTED_DIRT)
                 || d.equals(Material.COARSE_DIRT)
                 || d.equals(Material.PODZOL);
     }
@@ -438,10 +432,11 @@ public class B {
 
            if(!ix.startsWith("minecraft:"))
            {
+               /*
                if (ix.startsWith("oraxen:") && Iris.linkOraxen.supported()) {
                    bx = Iris.linkOraxen.getBlockDataFor(ix.split("\\Q:\\E")[1]);
                }
-
+               */
                if(bx == null)
                {
                    try
@@ -514,20 +509,38 @@ public class B {
             block = block.split("\\Q[\\E")[0];
 
             switch (block) {
-                case "cauldron" -> block = "water_cauldron";
-                case "grass_path" -> block = "dirt_path";
-                case "concrete" -> block = "white_concrete";
-                case "wool" -> block = "white_wool";
-                case "beetroots" -> {
+                case "cauldron":
+                    block = "water_cauldron";
+                    break;
+                case "grass_path":
+                    block = "dirt_path";
+                    break;
+                case "concrete":
+                    block = "white_concrete";
+                    break;
+                case "wool":
+                    block = "white_wool";
+                    break;
+                case "beetroots": {
                     if (stateMap.containsKey("age")) {
                         String updated = stateMap.get("age");
                         switch (updated) {
-                            case "7" -> updated = "3";
-                            case "3", "4", "5" -> updated = "2";
-                            case "1", "2" -> updated = "1";
+                            case "7":
+                                updated = "3";
+                                break;
+                            case "3":
+                            case "4":
+                            case "5":
+                                updated = "2";
+                                break;
+                            case "1":
+                            case "2":
+                                updated = "1";
+                                break;
                         }
                         stateMap.put("age", updated);
                     }
+                    break;
                 }
             }
 
@@ -572,9 +585,9 @@ public class B {
 
     public static boolean isUpdatable(BlockData mat) {
         return isLit(mat)
-                || isStorage(mat)
-                || (mat instanceof PointedDripstone
-                && ((PointedDripstone) mat).getThickness().equals(PointedDripstone.Thickness.TIP));
+                || isStorage(mat);
+                //|| (mat instanceof PointedDripstone
+                //&& ((PointedDripstone) mat).getThickness().equals(PointedDripstone.Thickness.TIP));
     }
 
     public static boolean isFoliage(Material d) {
@@ -634,7 +647,7 @@ public class B {
                 bt.add(v);
             }
         }
-
+        /*
         try {
             for (String i : Iris.linkOraxen.getItemTypes()) {
                 bt.add("oraxen:" + i);
@@ -642,6 +655,7 @@ public class B {
         } catch (Throwable e) {
             e.printStackTrace();
         }
+         */
 
         try {
             bt.addAll(Iris.service(RegistrySVC.class).getCustomBlockRegistry().compile());

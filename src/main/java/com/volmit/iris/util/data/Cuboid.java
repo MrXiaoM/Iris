@@ -692,18 +692,18 @@ public class Cuboid implements Iterable<Block>, Cloneable, ConfigurationSerializ
         Unknown;
 
         public CuboidDirection opposite() {
-            return switch (this) {
-                case North -> South;
-                case East -> West;
-                case South -> North;
-                case West -> East;
-                case Horizontal -> Vertical;
-                case Vertical -> Horizontal;
-                case Up -> Down;
-                case Down -> Up;
-                case Both -> Both;
-                default -> Unknown;
-            };
+            switch (this) {
+                case North: return South;
+                case East: return West;
+                case South: return North;
+                case West: return East;
+                case Horizontal: return Vertical;
+                case Vertical: return Horizontal;
+                case Up: return Down;
+                case Down: return Up;
+                case Both: return Both;
+            }
+            return Unknown;
         }
     }
 

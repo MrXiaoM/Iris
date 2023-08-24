@@ -47,12 +47,9 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
-import org.bukkit.generator.WorldInfo;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.List;
@@ -339,26 +336,5 @@ public class BukkitChunkGenerator extends ChunkGenerator implements PlatformChun
     @Override
     public boolean shouldGenerateStructures() {
         return false;
-    }
-
-    @Override
-    public boolean shouldGenerateNoise() {
-        return false;
-    }
-
-    @Override
-    public boolean shouldGenerateSurface() {
-        return false;
-    }
-
-    @Override
-    public boolean shouldGenerateBedrock() {
-        return false;
-    }
-
-    @Nullable
-    @Override
-    public BiomeProvider getDefaultBiomeProvider(@NotNull WorldInfo worldInfo) {
-        return null;
     }
 }

@@ -319,15 +319,15 @@ public enum IrisDirection {
 
     @Override
     public String toString() {
-        return switch (this) {
-            case DOWN_NEGATIVE_Y -> "Down";
-            case EAST_POSITIVE_X -> "East";
-            case NORTH_NEGATIVE_Z -> "North";
-            case SOUTH_POSITIVE_Z -> "South";
-            case UP_POSITIVE_Y -> "Up";
-            case WEST_NEGATIVE_X -> "West";
-        };
-
+        switch (this) {
+            case DOWN_NEGATIVE_Y: return "Down";
+            case EAST_POSITIVE_X: return "East";
+            case NORTH_NEGATIVE_Z: return "North";
+            case SOUTH_POSITIVE_Z: return "South";
+            case UP_POSITIVE_Y: return "Up";
+            case WEST_NEGATIVE_X: return "West";
+        }
+        return "Unknown";
     }
 
     public boolean isVertical() {

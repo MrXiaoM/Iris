@@ -164,7 +164,6 @@ dependencies {
     implementation 'org.bukkit:craftbukkit:1.16.5-R0.1-SNAPSHOT'
     implementation 'com.sk89q.worldedit:worldedit-bukkit:7.2.0-SNAPSHOT'
     implementation 'me.clip:placeholderapi:2.10.10'
-    implementation 'io.th0rgal:oraxen:1.94.0'
 
     // Shaded
     implementation 'com.dfsek:Paralithic:0.4.0'

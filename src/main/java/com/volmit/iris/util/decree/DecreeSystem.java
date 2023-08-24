@@ -147,7 +147,7 @@ public interface DecreeSystem extends CommandExecutor, TabCompleter {
 
         if (sender instanceof Player) {
             if (IrisSettings.get().getGeneral().isCommandSounds()) {
-                ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.25f, RNG.r.f(0.125f, 1.95f));
+                ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.25f, RNG.r.f(0.125f, 1.95f));
             }
         }
 
@@ -166,7 +166,7 @@ public interface DecreeSystem extends CommandExecutor, TabCompleter {
 
                 if (IrisSettings.get().getGeneral().isCommandSounds()) {
                     if (sender instanceof Player) {
-                        ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 0.25f);
+                        //((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 0.25f);
                         ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 0.2f, 0.45f);
                     }
                 }
@@ -175,7 +175,7 @@ public interface DecreeSystem extends CommandExecutor, TabCompleter {
             } else {
                 if (IrisSettings.get().getGeneral().isCommandSounds()) {
                     if (sender instanceof Player) {
-                        ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 1.65f);
+                        //((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.77f, 1.65f);
                         ((Player) sender).playSound(((Player) sender).getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.125f, 2.99f);
                     }
                 }

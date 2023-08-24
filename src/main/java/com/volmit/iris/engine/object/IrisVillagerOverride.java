@@ -40,26 +40,24 @@ import org.bukkit.inventory.ItemStack;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class IrisVillagerOverride {
-    @Desc("""
-            Disable the trade altogether.
-            If a cartographer villager gets a new explorer map trade:
-            If this is enabled -> the trade is removed
-            If this is disabled -> the trade is replaced with the "override" setting below
-            Default is true, so if you omit this, trades will be removed.""")
+    @Desc("Disable the trade altogether.\n" +
+          "If a cartographer villager gets a new explorer map trade:\n" +
+          "If this is enabled -> the trade is removed\n" +
+          "If this is disabled -> the trade is replaced with the \"override\" setting below\n" +
+          "Default is true, so if you omit this, trades will be removed.")
     private boolean disableTrade = true;
 
     @DependsOn("disableTrade")
     @Required
-    @Desc("""
-            The items to override the cartographer trade with.
-            By default, this is:
-                3 emeralds + 3 glass blocks -> 1 spyglass.
-                Can trade 3 to 5 times""")
+    @Desc("The items to override the cartographer trade with.\n" +
+          "By default, this is:\n" +
+          "    3 emeralds + 3 glass blocks -> 3 lime stained glass block.\n" +
+          "    Can trade 3 to 5 times")
     @ArrayType(min = 1, type = IrisVillagerTrade.class)
     private KList<IrisVillagerTrade> items = new KList<>(new IrisVillagerTrade()
             .setIngredient1(new ItemStack(Material.EMERALD, 3))
             .setIngredient2(new ItemStack(Material.GLASS, 3))
-            .setResult(new ItemStack(Material.SPYGLASS))
+            .setResult(new ItemStack(Material.LIME_STAINED_GLASS, 3))
             .setMinTrades(3)
             .setMaxTrades(5));
 

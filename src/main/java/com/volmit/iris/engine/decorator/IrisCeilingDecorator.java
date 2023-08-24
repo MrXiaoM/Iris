@@ -28,7 +28,6 @@ import com.volmit.iris.util.hunk.Hunk;
 import org.bukkit.Material;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.PointedDripstone;
 
 public class IrisCeilingDecorator extends IrisEngineDecorator {
     public IrisCeilingDecorator(Engine engine) {
@@ -69,7 +68,7 @@ public class IrisCeilingDecorator extends IrisEngineDecorator {
                     BlockData bd = threshold >= decorator.getTopThreshold() ?
                             decorator.getBlockDataForTop(biome, getRng(), realX, h, realZ, getData()) :
                             decorator.getBlockData100(biome, getRng(), realX, h, realZ, getData());
-
+/*
                     if (bd instanceof PointedDripstone) {
                         PointedDripstone.Thickness th = PointedDripstone.Thickness.BASE;
 
@@ -92,7 +91,7 @@ public class IrisCeilingDecorator extends IrisEngineDecorator {
                         ((PointedDripstone) bd).setThickness(th);
                         ((PointedDripstone) bd).setVerticalDirection(BlockFace.DOWN);
                     }
-
+*/
                     data.set(x, h, z, bd);
                 }
             }

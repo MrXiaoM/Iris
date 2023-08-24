@@ -54,12 +54,12 @@ public class Form {
         if (day >= 11 && day <= 13) {
             return Form.f(day) + "th";
         }
-        return switch (day % 10) {
-            case 1 -> Form.f(day) + "st";
-            case 2 -> Form.f(day) + "nd";
-            case 3 -> Form.f(day) + "rd";
-            default -> Form.f(day) + "th";
-        };
+        switch (day % 10) {
+            case 1: return Form.f(day) + "st";
+            case 2: return Form.f(day) + "nd";
+            case 3: return Form.f(day) + "rd";
+        }
+        return Form.f(day) + "th";
     }
 
     private static void instantiate() {

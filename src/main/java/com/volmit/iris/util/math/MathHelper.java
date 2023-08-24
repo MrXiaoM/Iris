@@ -18,10 +18,9 @@
 
 package com.volmit.iris.util.math;
 
-import net.minecraft.SystemUtils;
-import net.minecraft.core.BaseBlockPosition;
-import net.minecraft.world.phys.AxisAlignedBB;
-import net.minecraft.world.phys.Vec3D;
+import net.minecraft.server.v1_16_R3.BaseBlockPosition;
+import net.minecraft.server.v1_16_R3.SystemUtils;
+import net.minecraft.server.v1_16_R3.Vec3D;
 import org.bukkit.craftbukkit.libs.org.apache.commons.lang3.math.NumberUtils;
 
 import java.util.Random;
@@ -393,7 +392,7 @@ public class MathHelper {
         double var8 = ((3.0D * var4 - 5.0D) * var4 * var4 + 2.0D) * 0.5D;
         double var10 = ((-3.0D * var4 + 4.0D) * var4 + 1.0D) * var4 * 0.5D;
         double var12 = (var4 - 1.0D) * var4 * var4 * 0.5D;
-        return new Vec3D(var0.b * var6 + var1.b * var8 + var2.b * var10 + var3.b * var12, var0.c * var6 + var1.c * var8 + var2.c * var10 + var3.c * var12, var0.d * var6 + var1.d * var8 + var2.d * var10 + var3.d * var12);
+        return new Vec3D(var0.x * var6 + var1.x * var8 + var2.x * var10 + var3.x * var12, var0.y * var6 + var1.y * var8 + var2.y * var10 + var3.y * var12, var0.z * var6 + var1.z * var8 + var2.z * var10 + var3.z * var12);
     }
 
     public static long a(BaseBlockPosition var0) {
@@ -419,7 +418,7 @@ public class MathHelper {
     public static double c(double var0, double var2, double var4) {
         return (var0 - var2) / (var4 - var2);
     }
-
+/*
     public static boolean a(Vec3D var0, Vec3D var1, AxisAlignedBB var2) {
         double var3 = (var2.a + var2.d) * 0.5D;
         double var5 = (var2.d - var2.a) * 0.5D;
@@ -458,7 +457,7 @@ public class MathHelper {
             }
         }
     }
-
+*/
     public static double d(double var0, double var2) {
         double var4 = var2 * var2 + var0 * var0;
         if (Double.isNaN(var4)) {

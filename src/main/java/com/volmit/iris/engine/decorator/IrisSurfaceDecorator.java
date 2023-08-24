@@ -31,7 +31,6 @@ import org.bukkit.Material;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.PointedDripstone;
 
 public class IrisSurfaceDecorator extends IrisEngineDecorator {
     public IrisSurfaceDecorator(Engine engine) {
@@ -110,7 +109,7 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                     if (underwater && height + 1 + i > getDimension().getFluidHeight()) {
                         break;
                     }
-
+/*
                     if (bd instanceof PointedDripstone) {
                         PointedDripstone.Thickness th = PointedDripstone.Thickness.BASE;
 
@@ -133,7 +132,7 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                         ((PointedDripstone) bd).setThickness(th);
                         ((PointedDripstone) bd).setVerticalDirection(BlockFace.UP);
                     }
-
+*/
                     data.set(x, height + 1 + i, z, bd);
                 }
             }

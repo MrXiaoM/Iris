@@ -123,12 +123,24 @@ public class CommandIris implements DecreeExecutor {
     ) {
         Integer v = null;
         switch (operator) {
-            case "|" -> v = value1 | value2;
-            case "&" -> v = value1 & value2;
-            case "^" -> v = value1 ^ value2;
-            case "%" -> v = value1 % value2;
-            case ">>" -> v = value1 >> value2;
-            case "<<" -> v = value1 << value2;
+            case "|":
+                v = value1 | value2;
+                break;
+            case "&":
+                v = value1 & value2;
+                break;
+            case "^":
+                v = value1 ^ value2;
+                break;
+            case "%":
+                v = value1 % value2;
+                break;
+            case ">>":
+                v = value1 >> value2;
+                break;
+            case "<<":
+                v = value1 << value2;
+                break;
         }
         if (v == null) {
             sender().sendMessage(C.RED + "The operator you entered: (" + operator + ") is invalid!");

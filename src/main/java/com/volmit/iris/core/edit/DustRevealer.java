@@ -51,7 +51,7 @@ public class DustRevealer {
         J.s(() -> {
             new BlockSignal(world.getBlockAt(block.getX(), block.getY(), block.getZ()), 7);
             if (M.r(0.25)) {
-                world.playSound(block.toBlock(world).getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1f, RNG.r.f(0.2f, 2f));
+                world.playSound(block.toBlock(world).getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, RNG.r.f(0.2f, 2f));
             }
             J.a(() -> {
                 while (BlockSignal.active.get() > 128) {

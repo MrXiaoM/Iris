@@ -275,15 +275,15 @@ public enum Direction {
 
     @Override
     public String toString() {
-        return switch (this) {
-            case D -> "Down";
-            case E -> "East";
-            case N -> "North";
-            case S -> "South";
-            case U -> "Up";
-            case W -> "West";
-        };
-
+        switch (this) {
+            case D: return "Down";
+            case E: return "East";
+            case N: return "North";
+            case S: return "South";
+            case U: return "Up";
+            case W: return "West";
+        }
+        return "Unknown";
     }
 
     public boolean isVertical() {

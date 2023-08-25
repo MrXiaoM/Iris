@@ -252,10 +252,16 @@ public class Iris extends VolmitPlugin implements Listener {
     }
 
     public static void warn(String string) {
+        if ((string.contains("Unknown") || string.contains("Couldn't find")) && !IrisSettings.get().getGeneral().isDebug()) {
+            return;
+        }
         msg(C.YELLOW + string);
     }
 
     public static void error(String string) {
+        if ((string.contains("Unknown") || string.contains("Couldn't find")) && !IrisSettings.get().getGeneral().isDebug()) {
+            return;
+        }
         msg(C.RED + string);
     }
 

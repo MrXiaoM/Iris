@@ -17,5 +17,3 @@
  */
 
 rootProject.name = "Iris"
-include("api")
-

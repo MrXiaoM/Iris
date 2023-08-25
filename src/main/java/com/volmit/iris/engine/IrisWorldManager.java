@@ -22,15 +22,7 @@ import com.volmit.iris.Iris;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedWorldManager;
-import com.volmit.iris.engine.object.IRare;
-import com.volmit.iris.engine.object.IrisBiome;
-import com.volmit.iris.engine.object.IrisBlockDrops;
-import com.volmit.iris.engine.object.IrisEngineChunkData;
-import com.volmit.iris.engine.object.IrisEngineData;
-import com.volmit.iris.engine.object.IrisEngineSpawnerCooldown;
-import com.volmit.iris.engine.object.IrisEntitySpawn;
-import com.volmit.iris.engine.object.IrisRegion;
-import com.volmit.iris.engine.object.IrisSpawner;
+import com.volmit.iris.engine.object.*;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.format.Form;
@@ -45,6 +37,7 @@ import com.volmit.iris.util.scheduling.Looper;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.bukkit.Chunk;
+import org.bukkit.GameRule;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -243,6 +236,7 @@ public class IrisWorldManager extends EngineAssignedWorldManager {
     }
 
     private void spawnIn(Chunk c, boolean initial) {
+        if (!c.getWorld().getGameRuleValue(GameRule.DO_MOB_SPAWNING)) return;
         if (initial) {
             energy += 1.2;
         }
@@ -352,7 +346,11 @@ public class IrisWorldManager extends EngineAssignedWorldManager {
     }
 
     public boolean canSpawn(IrisSpawner i) {
-        return i.isValid(getEngine().getWorld().realWorld())
+        Engine engine = getEngine();
+        if (i == null || engine == null) return false;
+        IrisWorld world = engine.getWorld();
+        if (world == null) return false;
+        return i.isValid(world.realWorld())
                 && getCooldown(i).canSpawn(i.getMaximumRate());
     }
 

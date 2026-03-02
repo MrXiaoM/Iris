@@ -49,7 +49,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class StudioSVC implements IrisService {
-    public static final String LISTING = "https://raw.githubusercontent.com/IrisDimensions/_listing/main/listing-v2.json";
+    public static final String LISTING = "https://ghproxy.imciel.com/https://raw.githubusercontent.com/IrisDimensions/_listing/main/listing-v2.json";
     public static final String WORKSPACE_NAME = "packs";
     private static final AtomicCache<Integer> counter = new AtomicCache<>();
     private final KMap<String, String> cacheListing = null;
@@ -64,7 +64,7 @@ public class StudioSVC implements IrisService {
             if (!f.exists()) {
                 Iris.info("Downloading Default Pack " + pack);
                 if (pack.equals("overworld")) {
-                    String url = "https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
+                    String url = "https://ghproxy.imciel.com/https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
                     Iris.service(StudioSVC.class).downloadRelease(Iris.getSender(), url, false, false);
                 } else {
                     downloadSearch(Iris.getSender(), pack, false);
@@ -202,7 +202,7 @@ public class StudioSVC implements IrisService {
     }
 
     public void download(VolmitSender sender, String repo, String branch, boolean trim, boolean forceOverwrite, boolean directUrl) throws JsonSyntaxException, IOException {
-        String url = directUrl ? branch : "https://codeload.github.com/" + repo + "/zip/refs/heads/" + branch;
+        String url = directUrl ? branch : "https://ghproxy.imciel.com/https://github.com/" + repo + "/archive/refs/heads/" + branch + ".zip";
         sender.sendMessage("Downloading " + url + " "); //The extra space stops a bug in adventure API from repeating the last letter of the URL
         File zip = Iris.getNonCachedFile("pack-" + trim + "-" + repo, url);
         File temp = Iris.getTemp();
